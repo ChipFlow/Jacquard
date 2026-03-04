@@ -30,6 +30,11 @@ pub struct CosimOpts {
     pub stimulus_vcd: Option<std::path::PathBuf>,
     /// Path to write timing-accurate output VCD with per-signal arrival times.
     pub timing_vcd: Option<std::path::PathBuf>,
+    /// Path to dump DFF Q-values per cycle (for debugging/comparison).
+    /// Forces single-tick mode for the first N cycles.
+    pub dump_dff: Option<std::path::PathBuf>,
+    /// Number of cycles to dump DFF states (default 20).
+    pub dump_dff_cycles: usize,
 }
 
 /// Result of a co-simulation run.
@@ -1069,24 +1074,6 @@ pub(crate) struct GpioMapping {
     named_input_bits: HashMap<String, u32>,
 }
 
-impl GpioMapping {
-    /// All posedge flag bit positions across all clock domains.
-    fn all_posedge_flag_bits(&self) -> Vec<u32> {
-        self.clock_domains
-            .iter()
-            .flat_map(|d| d.posedge_flag_bits.iter().copied())
-            .collect()
-    }
-
-    /// All negedge flag bit positions across all clock domains.
-    fn all_negedge_flag_bits(&self) -> Vec<u32> {
-        self.clock_domains
-            .iter()
-            .flat_map(|d| d.negedge_flag_bits.iter().copied())
-            .collect()
-    }
-}
-
 /// Set a single bit in a packed u32 state buffer.
 #[inline]
 fn set_bit(state: &mut [u32], pos: u32, val: u8) {
@@ -1488,132 +1475,6 @@ fn set_flash_din(state: &mut [u32], gpio_map: &GpioMapping, d0_gpio: usize, din:
             set_bit(state, pos, (din >> i) & 1);
         }
     }
-}
-
-// ── BitOp Builder ────────────────────────────────────────────────────────────
-
-/// Build the BitOp array for a falling edge state_prep.
-/// Sets: clock=0, negedge_flag=1, clears: posedge_flag, plus reset.
-/// Flash D_IN is now handled by gpu_apply_flash_din kernel.
-fn build_falling_edge_ops(
-    gpio_map: &GpioMapping,
-    clock_gpio: usize,
-    reset_gpio: usize,
-    reset_val: u8,
-    constant_inputs: &HashMap<String, u8>,
-    constant_ports: &HashMap<String, u8>,
-) -> Vec<BitOp> {
-    let mut ops = Vec::new();
-    // Clock = 0
-    ops.push(BitOp {
-        position: gpio_map.input_bits[&clock_gpio],
-        value: 0,
-    });
-    // Reset
-    ops.push(BitOp {
-        position: gpio_map.input_bits[&reset_gpio],
-        value: reset_val as u32,
-    });
-    // Negedge flag = 1 (all domains)
-    for pos in gpio_map.all_negedge_flag_bits() {
-        ops.push(BitOp {
-            position: pos,
-            value: 1,
-        });
-    }
-    // Posedge flag = 0 (all domains)
-    for pos in gpio_map.all_posedge_flag_bits() {
-        ops.push(BitOp {
-            position: pos,
-            value: 0,
-        });
-    }
-    // Constant inputs
-    for (gpio_str, val) in constant_inputs {
-        if let Ok(gpio_idx) = gpio_str.parse::<usize>() {
-            if let Some(&pos) = gpio_map.input_bits.get(&gpio_idx) {
-                ops.push(BitOp {
-                    position: pos,
-                    value: *val as u32,
-                });
-            }
-        }
-    }
-    // Named constant ports (e.g. por_l, resetb_h)
-    for (port_name, val) in constant_ports {
-        if let Some(&pos) = gpio_map.named_input_bits.get(port_name) {
-            ops.push(BitOp {
-                position: pos,
-                value: *val as u32,
-            });
-            clilog::debug!("constant_port '{}' → pos {} = {}", port_name, pos, val);
-        } else {
-            clilog::warn!(
-                "constant_port '{}' not found in named_input_bits",
-                port_name
-            );
-        }
-    }
-    ops
-}
-
-/// Build the BitOp array for a rising edge state_prep.
-/// Sets: clock=1, posedge_flag=1, clears: negedge_flag, plus reset.
-/// Flash D_IN is now handled by gpu_apply_flash_din kernel.
-fn build_rising_edge_ops(
-    gpio_map: &GpioMapping,
-    clock_gpio: usize,
-    reset_gpio: usize,
-    reset_val: u8,
-    constant_inputs: &HashMap<String, u8>,
-    constant_ports: &HashMap<String, u8>,
-) -> Vec<BitOp> {
-    let mut ops = Vec::new();
-    // Clock = 1
-    ops.push(BitOp {
-        position: gpio_map.input_bits[&clock_gpio],
-        value: 1,
-    });
-    // Reset
-    ops.push(BitOp {
-        position: gpio_map.input_bits[&reset_gpio],
-        value: reset_val as u32,
-    });
-    // Posedge flag = 1 (all domains)
-    for pos in gpio_map.all_posedge_flag_bits() {
-        ops.push(BitOp {
-            position: pos,
-            value: 1,
-        });
-    }
-    // Negedge flag = 0 (all domains)
-    for pos in gpio_map.all_negedge_flag_bits() {
-        ops.push(BitOp {
-            position: pos,
-            value: 0,
-        });
-    }
-    // Constant inputs
-    for (gpio_str, val) in constant_inputs {
-        if let Ok(gpio_idx) = gpio_str.parse::<usize>() {
-            if let Some(&pos) = gpio_map.input_bits.get(&gpio_idx) {
-                ops.push(BitOp {
-                    position: pos,
-                    value: *val as u32,
-                });
-            }
-        }
-    }
-    // Named constant ports
-    for (port_name, val) in constant_ports {
-        if let Some(&pos) = gpio_map.named_input_bits.get(port_name) {
-            ops.push(BitOp {
-                position: pos,
-                value: *val as u32,
-            });
-        }
-    }
-    ops
 }
 
 // ── Multi-Clock Scheduler ────────────────────────────────────────────────────
@@ -2702,17 +2563,14 @@ pub fn run_cosim(
         })
         .collect();
 
-    // If no clock domains were matched, fall back to legacy single-clock behavior
-    // using all flag bits (same as before multi-clock support)
-    let use_legacy_single_clock = clock_timings.is_empty();
-    if use_legacy_single_clock {
-        clilog::info!(
-            "No clock domains matched from config; using legacy single-clock mode \
-             (all {} posedge + {} negedge flags toggle together)",
-            gpio_map.all_posedge_flag_bits().len(),
-            gpio_map.all_negedge_flag_bits().len()
-        );
-    } else {
+    assert!(
+        !clock_timings.is_empty(),
+        "No clock domains matched from config. Ensure clock_gpio matches a clock input \
+         in the netlist. Config clock_gpio={}, available domains: {:?}",
+        config.clock_gpio,
+        gpio_map.clock_domains.iter().map(|d| &d.name).collect::<Vec<_>>()
+    );
+    {
         for (i, clk_cfg) in effective_clocks.iter().enumerate() {
             if let Some(timing) = clock_timings.iter().find(|t| {
                 gpio_map.clock_domains[t.domain_index].clock_gpio == Some(clk_cfg.gpio)
@@ -2734,57 +2592,29 @@ pub fn run_cosim(
         }
     }
 
-    // Build per-schedule-tick BitOp buffers
-    let schedule_buffers = if use_legacy_single_clock {
-        // Legacy: single schedule entry, all flags toggle together
-        let fall_ops = build_falling_edge_ops(
-            &gpio_map,
-            clock_gpio,
-            reset_gpio,
-            reset_val_active,
-            &config.constant_inputs,
-            &config.constant_ports,
-        );
-        let rise_ops = build_rising_edge_ops(
-            &gpio_map,
-            clock_gpio,
-            reset_gpio,
-            reset_val_active,
-            &config.constant_inputs,
-            &config.constant_ports,
-        );
-        let fall_len = fall_ops.len();
-        let rise_len = rise_ops.len();
-        let fall_ops_buf = create_ops_buffer(&simulator.device, &fall_ops);
-        let rise_ops_buf = create_ops_buffer(&simulator.device, &rise_ops);
-        let fall_params = create_prep_params_buffer(
-            &simulator.device,
-            state_size as u32,
-            fall_ops.len() as u32,
-            0,
-            0,
-        );
-        let rise_params = create_prep_params_buffer(
-            &simulator.device,
-            state_size as u32,
-            rise_ops.len() as u32,
-            0,
-            0,
-        );
-        ScheduleBuffers {
-            tick_buffers: vec![(fall_params, fall_ops_buf, rise_params, rise_ops_buf)],
-            fall_ops_lens: vec![fall_len],
-            rise_ops_lens: vec![rise_len],
-        }
-    } else {
+    // Build per-cycle BitOp buffers from multi-clock schedule.
+    //
+    // The scheduler produces one entry per GCD tick (half-cycle edges).
+    // Each cosim tick = one full clock cycle = fall eval + rise eval.
+    // We pair consecutive schedule entries: fall_ops from entry 2*i,
+    // rise_ops from entry 2*i+1. This ensures DFFs capture on every tick.
+    let schedule_buffers = {
         let scheduler = MultiClockScheduler::new(&clock_timings);
-        let mut tick_buffers = Vec::with_capacity(scheduler.schedule.len());
-        let mut fall_ops_lens = Vec::with_capacity(scheduler.schedule.len());
-        let mut rise_ops_lens = Vec::with_capacity(scheduler.schedule.len());
+        assert!(
+            scheduler.schedule.len() % 2 == 0,
+            "Multi-clock schedule length {} must be even (each cycle = fall + rise)",
+            scheduler.schedule.len()
+        );
+        let num_cycles = scheduler.schedule.len() / 2;
+        let mut tick_buffers = Vec::with_capacity(num_cycles);
+        let mut fall_ops_lens = Vec::with_capacity(num_cycles);
+        let mut rise_ops_lens = Vec::with_capacity(num_cycles);
 
-        for tick_idx in 0..scheduler.schedule.len() {
+        for cycle_idx in 0..num_cycles {
+            let fall_tick_idx = cycle_idx * 2;
+            let rise_tick_idx = cycle_idx * 2 + 1;
             let fall_ops = scheduler.build_tick_fall_ops(
-                tick_idx,
+                fall_tick_idx,
                 &gpio_map,
                 reset_gpio,
                 reset_val_active,
@@ -2792,7 +2622,7 @@ pub fn run_cosim(
                 &config.constant_ports,
             );
             let rise_ops = scheduler.build_tick_rise_ops(
-                tick_idx,
+                rise_tick_idx,
                 &gpio_map,
                 reset_gpio,
                 reset_val_active,
@@ -2823,7 +2653,7 @@ pub fn run_cosim(
         }
 
         clilog::info!(
-            "Multi-clock schedule: {} ticks, {} Metal buffer sets",
+            "Multi-clock schedule: {} GCD ticks → {} cycle buffer sets",
             scheduler.schedule.len(),
             tick_buffers.len()
         );
@@ -3140,6 +2970,61 @@ pub fn run_cosim(
         None
     };
 
+    // ── DFF state dump setup (optional) ────────────────────────────────────
+    //
+    // When --dump-dff is specified, dump all DFF Q-values per cycle to a text file.
+    // Used for comparing internal state with CVC or other reference simulators.
+
+    struct DffDumpEntry {
+        cellid: usize,
+        q_pos: u32,
+        name: String,
+    }
+
+    let mut dff_dump_state: Option<(
+        std::io::BufWriter<std::fs::File>,
+        Vec<DffDumpEntry>,
+        usize, // max cycles to dump
+    )> = if let Some(ref dump_path) = opts.dump_dff {
+        use std::io::Write;
+        let file = std::fs::File::create(dump_path)
+            .unwrap_or_else(|e| panic!("Failed to create DFF dump {}: {}", dump_path.display(), e));
+        let mut writer = std::io::BufWriter::new(file);
+
+        // Build sorted mapping from DFF cell_id → (Q position, name)
+        let mut entries: Vec<DffDumpEntry> = Vec::new();
+        for (&cellid, dff) in aig.dffs.iter() {
+            if let Some(&pos) = script.input_map.get(&dff.q) {
+                let name = format!("{}", netlistdb.cellnames[cellid]);
+                entries.push(DffDumpEntry { cellid, q_pos: pos, name });
+            }
+        }
+        entries.sort_by_key(|e| e.cellid);
+
+        // Write header
+        writeln!(writer, "# DFF State Dump").unwrap();
+        writeln!(writer, "# Total DFFs: {}", entries.len()).unwrap();
+        writeln!(writer, "# Format: CYCLE <n> hash=<hex> ones=<count>/<total>").unwrap();
+        writeln!(writer, "# Then: <dff_name> <0|1>").unwrap();
+        writeln!(writer, "#").unwrap();
+        writeln!(writer, "# DFF index mapping:").unwrap();
+        for (i, e) in entries.iter().enumerate() {
+            writeln!(writer, "# DFF[{}] pos={} cell={} name={}", i, e.q_pos, e.cellid, e.name).unwrap();
+        }
+        writeln!(writer, "#").unwrap();
+
+        let max_cycles = opts.dump_dff_cycles;
+        clilog::info!(
+            "DFF dump enabled: {} DFFs, {} cycles → {}",
+            entries.len(),
+            max_cycles,
+            dump_path.display()
+        );
+        Some((writer, entries, max_cycles))
+    } else {
+        None
+    };
+
     // ── GPU-only simulation loop ─────────────────────────────────────────
     //
     // All IO models (flash + UART) run on GPU. No per-tick CPU interaction.
@@ -3231,10 +3116,14 @@ pub fn run_cosim(
 
     let mut tick: usize = 0;
     while tick < max_ticks {
+        let dff_dump_active = dff_dump_state.as_ref()
+            .map_or(false, |(_, _, max)| tick < reset_cycles + *max);
         let batch = if opts.check_with_cpu && tick < cpu_check_max_ticks {
             1 // single tick for CPU comparison
         } else if stimulus_vcd_state.is_some() || timing_vcd_state.is_some() {
             1 // single tick for stimulus/timing VCD capture
+        } else if dff_dump_active {
+            1 // single tick for DFF state capture
         } else if trace_ticks > 0 && tick < reset_cycles + trace_ticks {
             1 // single tick for tracing
         } else if deep_diag {
@@ -3480,6 +3369,75 @@ pub fn run_cosim(
                         },
                     )
                     .unwrap();
+            }
+        }
+
+        // ── Dump DFF states (if active for this cycle) ──
+        if dff_dump_active && tick >= reset_cycles {
+            use std::io::Write;
+            let input_state: &[u32] = unsafe {
+                std::slice::from_raw_parts(
+                    states_buffer.contents() as *const u32,
+                    state_size,
+                )
+            };
+            let output_state_dff: &[u32] = unsafe {
+                std::slice::from_raw_parts(
+                    (states_buffer.contents() as *const u32).add(state_size),
+                    state_size,
+                )
+            };
+            let cycle = tick - reset_cycles;
+            if let Some((ref mut writer, ref entries, _)) = dff_dump_state {
+                // Compute hash for both input_state (pre-capture) and output_state (post-capture)
+                let mut in_hash: u64 = 0;
+                let mut in_ones: usize = 0;
+                let mut out_hash: u64 = 0;
+                let mut out_ones: usize = 0;
+                let mut diffs: usize = 0;
+                for e in entries.iter() {
+                    let word = (e.q_pos / 32) as usize;
+                    let bit = e.q_pos & 31;
+                    let in_val = if word < input_state.len() {
+                        ((input_state[word] >> bit) & 1) as u8
+                    } else { 0 };
+                    let out_val = if word < output_state_dff.len() {
+                        ((output_state_dff[word] >> bit) & 1) as u8
+                    } else { 0 };
+                    if in_val != 0 {
+                        in_ones += 1;
+                        in_hash = in_hash
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(e.q_pos as u64);
+                    }
+                    if out_val != 0 {
+                        out_ones += 1;
+                        out_hash = out_hash
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(e.q_pos as u64);
+                    }
+                    if in_val != out_val {
+                        diffs += 1;
+                    }
+                }
+
+                writeln!(writer, "CYCLE {} input_hash={:016X} input_ones={}/{} output_hash={:016X} output_ones={}/{} diffs={}",
+                    cycle, in_hash, in_ones, entries.len(),
+                    out_hash, out_ones, entries.len(), diffs).unwrap();
+                // Write per-DFF values (both input and output)
+                for e in entries.iter() {
+                    let word = (e.q_pos / 32) as usize;
+                    let bit = e.q_pos & 31;
+                    let in_val = if word < input_state.len() {
+                        ((input_state[word] >> bit) & 1) as u8
+                    } else { 0 };
+                    let out_val = if word < output_state_dff.len() {
+                        ((output_state_dff[word] >> bit) & 1) as u8
+                    } else { 0 };
+                    let marker = if in_val != out_val { " *" } else { "" };
+                    writeln!(writer, "{} in={} out={}{}", e.name, in_val, out_val, marker).unwrap();
+                }
+                writeln!(writer).unwrap();
             }
         }
 

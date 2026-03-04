@@ -193,6 +193,15 @@ struct CosimArgs {
     /// by their computed arrival times. Forces single-tick mode.
     #[clap(long)]
     timing_vcd: Option<PathBuf>,
+
+    /// Dump all DFF Q-values per cycle to a text file for debugging.
+    /// Forces single-tick mode for the specified number of cycles (default 20).
+    #[clap(long)]
+    dump_dff: Option<PathBuf>,
+
+    /// Number of cycles to dump DFF states for (used with --dump-dff).
+    #[clap(long, default_value = "20")]
+    dump_dff_cycles: usize,
 }
 
 #[derive(Parser)]
@@ -1189,7 +1198,7 @@ fn sim_hip(
 }
 
 #[cfg(any(feature = "metal", feature = "cuda", feature = "hip"))]
-fn run_timing_analysis(aig: &mut AIG, args: &SimArgs) {
+fn run_timing_analysis(aig: &mut jacquard::aig::AIG, args: &SimArgs) {
     use jacquard::liberty_parser::TimingLibrary;
 
     clilog::info!("Running timing analysis on GPU simulation results...");
@@ -1403,6 +1412,8 @@ fn cmd_cosim(args: CosimArgs) {
             clock_period: args.clock_period,
             stimulus_vcd: args.stimulus_vcd.clone(),
             timing_vcd: args.timing_vcd.clone(),
+            dump_dff: args.dump_dff.clone(),
+            dump_dff_cycles: args.dump_dff_cycles,
         };
 
         let result =
