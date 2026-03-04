@@ -503,22 +503,21 @@ jobs:
             --constant-port resetb_h=1 \
             --constant-port resetb_l=1
 
-      - name: Run GPU co-simulation (100K ticks)
-        timeout-minutes: 15
+      - name: Run GPU co-simulation (500K ticks)
+        timeout-minutes: 30
         run: |
           cargo run --release --features metal --bin jacquard -- cosim \
             tests/mcu_soc/data/6_final.v \
             --config tests/mcu_soc/sim_config.json --top-module top \
-            --max-cycles 100000 \
+            --max-cycles 500000 \
             2>&1 | tee cosim_output.txt
 
       - name: Verify UART boot output
-        continue-on-error: true
         run: |
           if grep -q "nyaa" cosim_output.txt; then
             echo "MCU SoC booted successfully - UART output detected"
           else
-            echo "WARNING: Expected UART output 'nyaa' not found (may need more cycles without SDF)"
+            echo "FAIL: Expected UART output 'nyaa' not found in cosim output"
             echo "--- Last 50 lines of simulation output ---"
             tail -50 cosim_output.txt
             exit 1
