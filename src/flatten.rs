@@ -1784,6 +1784,51 @@ impl FlattenedScriptV1 {
             cellid_to_sdf_path.insert(cellid, sdf_path);
         }
 
+        // Detect hierarchy prefix mismatch: if the netlist has a wrapper hierarchy
+        // (e.g., openframe_project_wrapper → top top_inst → cells), the NetlistDB
+        // paths will be "top_inst._58619_" but the SDF (generated against the flat
+        // `top` module) will have just "_58619_".
+        // Fix: find a common prefix in NetlistDB paths that doesn't exist in SDF,
+        // and strip it.
+        {
+            // Sample a few paths and check if they match SDF cells
+            let mut sample_hits = 0usize;
+            let mut sample_misses = 0usize;
+            let mut common_prefix: Option<String> = None;
+            for (_, path) in cellid_to_sdf_path.iter().take(100) {
+                if sdf.get_cell(path).is_some() {
+                    sample_hits += 1;
+                } else {
+                    sample_misses += 1;
+                    // Check if stripping the first dot-separated component helps
+                    if let Some(dot_pos) = path.find('.') {
+                        let stripped = &path[dot_pos + 1..];
+                        if sdf.get_cell(stripped).is_some() {
+                            let prefix = &path[..dot_pos];
+                            if common_prefix.is_none() {
+                                common_prefix = Some(prefix.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            // If most lookups fail but stripping a prefix works, apply globally
+            if sample_misses > sample_hits && common_prefix.is_some() {
+                let prefix = common_prefix.unwrap();
+                let prefix_dot = format!("{}.", prefix);
+                clilog::info!(
+                    "SDF hierarchy prefix mismatch detected: stripping '{}' from {} cell paths",
+                    prefix_dot,
+                    cellid_to_sdf_path.len()
+                );
+                for path in cellid_to_sdf_path.values_mut() {
+                    if let Some(stripped) = path.strip_prefix(&prefix_dot) {
+                        *path = stripped.to_string();
+                    }
+                }
+            }
+        }
+
         // Build reverse map: SDF path → cellid for efficient lookup
         let mut sdf_path_to_cellid: HashMap<&str, usize> = HashMap::new();
         for (&cellid, path) in &cellid_to_sdf_path {
