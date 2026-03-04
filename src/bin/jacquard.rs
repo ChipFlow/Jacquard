@@ -180,6 +180,14 @@ struct CosimArgs {
     /// Forces single-tick mode for accurate per-cycle capture.
     #[clap(long)]
     stimulus_vcd: Option<PathBuf>,
+
+    /// Enable timing-accurate VCD output with per-signal arrival times.
+    ///
+    /// Requires SDF timing data (via --sdf or config.timing.sdf_file).
+    /// Signal transitions in the output VCD are offset from clock edges
+    /// by their computed arrival times. Forces single-tick mode.
+    #[clap(long)]
+    timing_vcd: Option<PathBuf>,
 }
 
 #[allow(unused_variables)]
@@ -1288,6 +1296,16 @@ fn cmd_cosim(args: CosimArgs) {
         };
 
         let mut design = setup::load_design(&design_args);
+
+        // Enable timing arrival readback if --timing-vcd is set
+        if args.timing_vcd.is_some() {
+            if !design.script.timing_enabled {
+                eprintln!("Error: --timing-vcd requires SDF timing data (via --sdf or config.timing.sdf_file)");
+                std::process::exit(1);
+            }
+            design.script.enable_timing_arrivals();
+        }
+
         let timing_constraints = setup::build_timing_constraints(&design.script);
 
         let opts = CosimOpts {
@@ -1298,6 +1316,7 @@ fn cmd_cosim(args: CosimArgs) {
             gpu_profile: args.gpu_profile,
             clock_period: args.clock_period,
             stimulus_vcd: args.stimulus_vcd.clone(),
+            timing_vcd: args.timing_vcd.clone(),
         };
 
         let result =

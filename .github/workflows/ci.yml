@@ -523,14 +523,24 @@ jobs:
             exit 1
           fi
 
-      - name: Capture stimulus VCD (10K ticks)
-        timeout-minutes: 10
+      - name: Strip SDF timing checks for GPU simulation
+        run: |
+          # Remove TIMINGCHECK directives from SDF (timing checks can cause parser errors)
+          uv run tests/mcu_soc/cvc/strip_sdf_checks.py \
+            tests/mcu_soc/data/6_final.sdf \
+            tests/mcu_soc/data/6_final_stripped.sdf
+
+      - name: Capture stimulus + timing VCD via cosim (10K ticks)
+        timeout-minutes: 15
         run: |
           cargo run --release --features metal --bin jacquard -- cosim \
             tests/mcu_soc/data/6_final.v \
             --config tests/mcu_soc/sim_config.json --top-module top \
             --max-cycles 10000 \
+            --sdf tests/mcu_soc/data/6_final_stripped.sdf \
+            --sdf-corner typ \
             --stimulus-vcd tests/mcu_soc/stimulus.vcd \
+            --timing-vcd tests/mcu_soc/loom_timed_mcu.vcd \
             2>&1 | tee cosim_stimulus.txt
 
       - name: Replay stimulus (non-timed, for CVC comparison)
@@ -546,30 +556,6 @@ jobs:
             --max-cycles 10000 \
             2>&1 | tee metal_mcu_replay.txt
 
-      - name: Strip SDF timing checks for GPU simulation
-        run: |
-          # Remove TIMINGCHECK directives from SDF (timing checks can cause parser errors)
-          uv run tests/mcu_soc/cvc/strip_sdf_checks.py \
-            tests/mcu_soc/data/6_final.sdf \
-            tests/mcu_soc/data/6_final_stripped.sdf
-
-      - name: Replay with timing VCD (experimental)
-        timeout-minutes: 15
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          cargo run --release --features metal --bin jacquard -- sim \
-            tests/mcu_soc/data/6_final.v \
-            tests/mcu_soc/stimulus.vcd \
-            tests/mcu_soc/loom_timed_mcu.vcd \
-            1 \
-            --sdf tests/mcu_soc/data/6_final_stripped.sdf \
-            --sdf-corner typ \
-            --timing-vcd \
-            --top-module top \
-            --max-cycles 10000 \
-            2>&1 | tee metal_mcu_timed.txt
-
       - name: Report simulation results
         if: always()
         run: |
@@ -584,10 +570,10 @@ jobs:
               tail -20 metal_mcu_replay.txt
               echo "\`\`\`"
             fi
-            if [ -f metal_mcu_timed.txt ]; then
-              echo "## MCU SoC Timing VCD Replay (experimental)"
+            if [ -f cosim_stimulus.txt ]; then
+              echo "## MCU SoC Cosim Timing VCD"
               echo "\`\`\`"
-              tail -20 metal_mcu_timed.txt
+              tail -20 cosim_stimulus.txt
               echo "\`\`\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
@@ -601,7 +587,6 @@ jobs:
             cosim_output.txt
             cosim_stimulus.txt
             metal_mcu_replay.txt
-            metal_mcu_timed.txt
             tests/mcu_soc/sim_config.json
             tests/mcu_soc/stimulus.vcd
             tests/mcu_soc/loom_replay_mcu.vcd

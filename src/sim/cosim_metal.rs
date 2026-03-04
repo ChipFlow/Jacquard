@@ -28,6 +28,8 @@ pub struct CosimOpts {
     pub clock_period: Option<u64>,
     /// Path to write stimulus VCD (all primary inputs driven by cosim).
     pub stimulus_vcd: Option<std::path::PathBuf>,
+    /// Path to write timing-accurate output VCD with per-signal arrival times.
+    pub timing_vcd: Option<std::path::PathBuf>,
 }
 
 /// Result of a co-simulation run.
@@ -47,6 +49,7 @@ struct SimParams {
     state_size: u64,
     current_cycle: u64,
     current_stage: u64,
+    arrival_state_offset: u64,
 }
 
 /// Bit set/clear operation (must match Metal shader BitOp struct).
@@ -305,7 +308,7 @@ impl MetalSimulator {
         event_buffer_metal: &metal::Buffer,
         timing_constraints_buffer: Option<&metal::Buffer>,
     ) {
-        self.write_params(stage_i, num_blocks, num_major_stages, state_size, cycle_i);
+        self.write_params(stage_i, num_blocks, num_major_stages, state_size, cycle_i, 0);
 
         let command_buffer = self.command_queue.new_command_buffer();
         self.encode_dispatch(
@@ -332,6 +335,7 @@ impl MetalSimulator {
         num_major_stages: usize,
         state_size: usize,
         cycle_i: usize,
+        arrival_state_offset: u32,
     ) {
         let params = SimParams {
             num_blocks: num_blocks as u64,
@@ -340,6 +344,7 @@ impl MetalSimulator {
             state_size: state_size as u64,
             current_cycle: cycle_i as u64,
             current_stage: stage_i as u64,
+            arrival_state_offset: arrival_state_offset as u64,
         };
         unsafe {
             std::ptr::write(
@@ -520,6 +525,7 @@ impl MetalSimulator {
         wb_trace_channel_buffer: &metal::Buffer,
         wb_trace_params_buffer: &metal::Buffer,
         timing_constraints_buffer: Option<&metal::Buffer>,
+        arrival_state_offset: u32,
     ) -> u64 {
         let batch_done = self.event_counter.get() + 1;
         let cb = self.command_queue.new_command_buffer();
@@ -539,7 +545,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, arrival_state_offset);
                 self.encode_dispatch(
                     cb,
                     num_blocks,
@@ -573,7 +579,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, arrival_state_offset);
                 self.encode_dispatch(
                     cb,
                     num_blocks,
@@ -668,7 +674,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 self.encode_dispatch(
                     cb,
                     num_blocks,
@@ -696,7 +702,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 self.encode_dispatch(
                     cb,
                     num_blocks,
@@ -765,7 +771,7 @@ impl MetalSimulator {
 
             // 3. simulate (falling) — isolated per stage
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 let cb2 = self.command_queue.new_command_buffer();
                 self.encode_dispatch(
                     cb2,
@@ -821,7 +827,7 @@ impl MetalSimulator {
 
             // 6. simulate (rising) — isolated per stage
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 let cb4 = self.command_queue.new_command_buffer();
                 self.encode_dispatch(
                     cb4,
@@ -885,7 +891,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 self.encode_dispatch(
                     cb_full,
                     num_blocks,
@@ -918,7 +924,7 @@ impl MetalSimulator {
                 flash_din_params_buffer,
             );
             for stage_i in 0..num_major_stages {
-                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+                self.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, 0);
                 self.encode_dispatch(
                     cb_full,
                     num_blocks,
@@ -2450,7 +2456,9 @@ pub fn run_cosim(
     let netlistdb = &design.netlistdb;
     let num_blocks = script.num_blocks;
     let num_major_stages = script.num_major_stages;
-    let state_size = script.reg_io_state_size as usize;
+    // When timing arrivals are enabled, each state slot includes the arrival section.
+    let state_size = script.effective_state_size() as usize;
+    let arrival_state_offset = script.arrival_state_offset;
 
     // ── Build GPIO mapping ───────────────────────────────────────────────
 
@@ -3025,7 +3033,7 @@ pub fn run_cosim(
 
     // Pre-write params for all simulation stages (they don't change between ticks)
     for stage_i in 0..num_major_stages {
-        simulator.write_params(stage_i, num_blocks, num_major_stages, state_size, 0);
+        simulator.write_params(stage_i, num_blocks, num_major_stages, state_size, 0, arrival_state_offset);
     }
 
     clilog::finish!(timer_prep);
@@ -3094,6 +3102,38 @@ pub fn run_cosim(
             "Stimulus VCD enabled: {} signals → {}",
             mapping.signals.len(),
             stim_path.display()
+        );
+        Some((writer, mapping, prev_values))
+    } else {
+        None
+    };
+
+    // ── Timing VCD setup (optional) ──────────────────────────────────────
+    //
+    // When --timing-vcd is specified, we write timing-accurate output VCD
+    // with per-signal arrival time offsets from clock edges.
+
+    let rio = script.reg_io_state_size as usize;
+    let mut timing_vcd_state: Option<(
+        vcd_ng::Writer<std::io::BufWriter<std::fs::File>>,
+        crate::sim::vcd_io::OutputVCDMapping,
+        Vec<u32>, // prev_values for change detection (0=V0, 1=V1, 2=initial)
+    )> = if let Some(ref timing_path) = opts.timing_vcd {
+        let file = std::fs::File::create(timing_path)
+            .unwrap_or_else(|e| panic!("Failed to create timing VCD {}: {}", timing_path.display(), e));
+        let bufwriter = std::io::BufWriter::new(file);
+        let mut writer = vcd_ng::Writer::new(bufwriter);
+        let mapping = crate::sim::vcd_io::setup_cosim_output_vcd(
+            &mut writer,
+            netlistdb,
+            aig,
+            script,
+        );
+        let prev_values = vec![2u32; mapping.out2vcd.len()]; // 2 = initial sentinel
+        clilog::info!(
+            "Timing VCD enabled: {} output signals → {}",
+            mapping.out2vcd.len(),
+            timing_path.display()
         );
         Some((writer, mapping, prev_values))
     } else {
@@ -3193,8 +3233,8 @@ pub fn run_cosim(
     while tick < max_ticks {
         let batch = if opts.check_with_cpu && tick < cpu_check_max_ticks {
             1 // single tick for CPU comparison
-        } else if stimulus_vcd_state.is_some() {
-            1 // single tick for stimulus VCD capture
+        } else if stimulus_vcd_state.is_some() || timing_vcd_state.is_some() {
+            1 // single tick for stimulus/timing VCD capture
         } else if trace_ticks > 0 && tick < reset_cycles + trace_ticks {
             1 // single tick for tracing
         } else if deep_diag {
@@ -3300,6 +3340,7 @@ pub fn run_cosim(
             &wb_trace_channel_buffer,
             &wb_trace_params_buffer,
             timing_constraints_buffer.as_ref(),
+            arrival_state_offset,
         );
         schedule_offset = (schedule_offset + batch) % schedule_buffers.tick_buffers.len();
         prof_batch_encode += t_encode.elapsed().as_nanos() as u64;
@@ -3365,6 +3406,80 @@ pub fn run_cosim(
                         .unwrap();
                     prev_values[sig_idx] = val;
                 }
+            }
+        }
+
+        // ── Write timing VCD entries (output signals with arrival offsets) ──
+        if let Some((ref mut writer, ref mapping, ref mut prev_values)) = timing_vcd_state {
+            let output_state: &[u32] = unsafe {
+                std::slice::from_raw_parts(
+                    (states_buffer.contents() as *const u32).add(state_size),
+                    state_size,
+                )
+            };
+
+            // Base timestamp: rising edge of this tick (in ps).
+            // Cosim ticks represent full clock cycles; output is latched after rising edge.
+            let half_period = clock_period_ps / 2;
+            let base_timestamp = tick as u64 * clock_period_ps + half_period;
+
+            // Collect transitions with arrival time offsets, then sort by timestamp
+            let mut timed_transitions: Vec<(u64, usize, u32)> = Vec::new();
+
+            for (i, &(output_aigpin, output_pos, _vid)) in mapping.out2vcd.iter().enumerate() {
+                let value_new = match output_pos {
+                    u32::MAX => {
+                        assert!(output_aigpin <= 1);
+                        output_aigpin as u32
+                    }
+                    pos => {
+                        (output_state[(pos >> 5) as usize] >> (pos & 31)) & 1
+                    }
+                };
+
+                if value_new == prev_values[i] {
+                    continue;
+                }
+                prev_values[i] = value_new;
+
+                // Get arrival time from the arrival section of the output state
+                let arrival_ps = if output_pos != u32::MAX && arrival_state_offset > 0 {
+                    let arrival_section = &output_state[arrival_state_offset as usize..];
+                    let word_idx = (output_pos >> 5) as usize;
+                    if word_idx < rio {
+                        (arrival_section[word_idx] & 0xFFFF) as u64
+                    } else {
+                        0u64
+                    }
+                } else {
+                    0u64
+                };
+
+                let actual_timestamp = base_timestamp + arrival_ps;
+                timed_transitions.push((actual_timestamp, i, value_new));
+            }
+
+            // Sort by timestamp (stable preserves signal order within same timestamp)
+            timed_transitions.sort_by_key(|&(ts, _, _)| ts);
+
+            // Write sorted transitions
+            let mut current_timestamp = u64::MAX;
+            for &(ts, i, value_new) in &timed_transitions {
+                if ts != current_timestamp {
+                    writer.timestamp(ts).unwrap();
+                    current_timestamp = ts;
+                }
+                let (_, _, vid) = mapping.out2vcd[i];
+                writer
+                    .change_scalar(
+                        vid,
+                        if value_new != 0 {
+                            vcd_ng::Value::V1
+                        } else {
+                            vcd_ng::Value::V0
+                        },
+                    )
+                    .unwrap();
             }
         }
 
