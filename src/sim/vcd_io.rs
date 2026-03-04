@@ -622,6 +622,64 @@ pub fn setup_output_vcd(
     OutputVCDMapping { out2vcd }
 }
 
+/// Set up output VCD writer for cosim: uses explicit timescale (1ps) instead of VCD header.
+///
+/// Same output port enumeration as `setup_output_vcd`, but takes timescale directly
+/// (cosim has no input VCD header to copy from).
+pub fn setup_cosim_output_vcd<W: std::io::Write>(
+    writer: &mut vcd_ng::Writer<W>,
+    netlistdb: &NetlistDB,
+    aig: &AIG,
+    script: &FlattenedScriptV1,
+) -> OutputVCDMapping {
+    use vcd_ng::SimulationCommand;
+
+    writer.timescale(1, vcd_ng::TimescaleUnit::PS).unwrap();
+    writer.add_module("top").unwrap();
+
+    let out2vcd = netlistdb
+        .cell2pin
+        .iter_set(0)
+        .filter_map(|i| {
+            if netlistdb.pindirect[i] == Direction::I {
+                let aigpin = aig.pin2aigpin_iv[i];
+                if matches!(aig.drivers[aigpin >> 1], DriverType::InputPort(_)) {
+                    return None;
+                }
+                if aigpin <= 1 {
+                    return Some((
+                        aigpin,
+                        u32::MAX,
+                        writer
+                            .add_wire(1, &format!("{}", netlistdb.pinnames[i].dbg_fmt_pin()))
+                            .unwrap(),
+                    ));
+                }
+                Some((
+                    aigpin,
+                    *script.output_map.get(&aigpin).unwrap(),
+                    writer
+                        .add_wire(1, &format!("{}", netlistdb.pinnames[i].dbg_fmt_pin()))
+                        .unwrap(),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    writer.upscope().unwrap();
+    writer.enddefinitions().unwrap();
+    writer.begin(SimulationCommand::Dumpvars).unwrap();
+
+    clilog::info!(
+        "Cosim output VCD: {} output signals registered (timescale=1ps)",
+        out2vcd.len()
+    );
+
+    OutputVCDMapping { out2vcd }
+}
+
 /// Write simulation results to output VCD.
 pub fn write_output_vcd(
     writer: &mut vcd_ng::Writer<std::io::BufWriter<std::fs::File>>,
