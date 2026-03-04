@@ -242,18 +242,20 @@ pub fn load_sdf(
 ///
 /// Returns `Some((clock_ps, constraint_buffer))` if timing is enabled,
 /// where `constraint_buffer` = `[clock_ps, constraints[0], constraints[1], ...]`.
-pub fn build_timing_constraints(script: &FlattenedScriptV1) -> Option<Vec<u32>> {
+pub fn build_timing_constraints(script: &FlattenedScriptV1, timing_capture: bool) -> Option<Vec<u32>> {
     if script.timing_enabled && !script.dff_constraints.is_empty() {
         let (clock_ps, constraints) = script.build_timing_constraint_buffer();
+        assert!(clock_ps < (1 << 31), "clock_period_ps {} exceeds bit-flag encoding limit", clock_ps);
         let non_zero = constraints.iter().filter(|&&v| v != 0).count();
         clilog::info!(
-            "Timing constraints: {} words, {} with DFF constraints, clock_period={}ps",
+            "Timing constraints: {} words, {} with DFF constraints, clock_period={}ps, capture={}",
             constraints.len(),
             non_zero,
-            clock_ps
+            clock_ps,
+            timing_capture
         );
         let mut buf = Vec::with_capacity(1 + constraints.len());
-        buf.push(clock_ps);
+        buf.push(if timing_capture { clock_ps | (1 << 31) } else { clock_ps });
         buf.extend_from_slice(&constraints);
         Some(buf)
     } else {

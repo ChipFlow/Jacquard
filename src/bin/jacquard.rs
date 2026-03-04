@@ -126,6 +126,14 @@ struct SimArgs {
     /// clock edge.
     #[clap(long)]
     timing_vcd: bool,
+
+    /// Enable timing-aware DFF capture gating.
+    ///
+    /// Requires --sdf. When a signal arrives too late for the clock edge
+    /// (setup violation), the DFF defers capture to the next cycle instead
+    /// of sampling the late value.
+    #[clap(long)]
+    timing_capture: bool,
 }
 
 #[derive(Parser)]
@@ -193,6 +201,15 @@ struct CosimArgs {
     /// by their computed arrival times. Forces single-tick mode.
     #[clap(long)]
     timing_vcd: Option<PathBuf>,
+
+    /// Enable timing-aware DFF capture gating.
+    ///
+    /// Requires SDF timing data (via --sdf or config.timing.sdf_file).
+    /// When a signal arrives too late for the clock edge (setup violation),
+    /// the DFF defers capture to the next cycle instead of sampling the
+    /// late value.
+    #[clap(long)]
+    timing_capture: bool,
 
     /// Dump all DFF Q-values per cycle to a text file for debugging.
     /// Forces single-tick mode for the specified number of cycles (default 20).
@@ -269,7 +286,14 @@ fn cmd_sim(args: SimArgs) {
         design.script.enable_timing_arrivals();
     }
 
-    let timing_constraints = setup::build_timing_constraints(&design.script);
+    if args.timing_capture {
+        if args.sdf.is_none() && args.liberty.is_none() {
+            eprintln!("Error: --timing-capture requires --sdf or --liberty");
+            std::process::exit(1);
+        }
+    }
+
+    let timing_constraints = setup::build_timing_constraints(&design.script, args.timing_capture);
 
     // Parse input VCD
     let input_vcd = std::fs::File::open(&args.input_vcd).unwrap();
@@ -1401,7 +1425,12 @@ fn cmd_cosim(args: CosimArgs) {
             design.script.enable_timing_arrivals();
         }
 
-        let timing_constraints = setup::build_timing_constraints(&design.script);
+        if args.timing_capture && !design.script.timing_enabled {
+            eprintln!("Error: --timing-capture requires SDF timing data (via --sdf or config.timing.sdf_file)");
+            std::process::exit(1);
+        }
+
+        let timing_constraints = setup::build_timing_constraints(&design.script, args.timing_capture);
 
         let opts = CosimOpts {
             max_cycles: args.max_cycles,
