@@ -381,7 +381,7 @@ __shared__ u8 shared_arrival[256][32];  // Per-bit arrivals
 <li>Timing-aware bit packing for reduced approximation error (future)</li>
 </ul>
 <h2 id="conservative-timing-model-sources-of-overestimation"><a class="header" href="#conservative-timing-model-sources-of-overestimation">Conservative Timing Model: Sources of Overestimation</a></h2>
-<p>Loom's GPU timing is intentionally conservative — it may over-estimate arrival times
+<p>Jacquard's GPU timing is intentionally conservative — it may over-estimate arrival times
 but will never under-estimate them. This is important for setup violation detection:
 false positives are safe, false negatives would miss real bugs.</p>
 <p>There are three independent sources of conservatism, each adding to the overestimate:</p>
@@ -396,12 +396,12 @@ Boolean signals simultaneously — there's no per-bit transition direction avail
 <span class="boring">}</span></code></pre></pre>
 <p><strong>Impact</strong>: For the SKY130 inv_chain test (16 inverters), rise delays average ~10ps
 larger than fall delays. In a real inverter chain, transitions alternate (rise→fall→rise),
-so half the cells use the smaller fall delay. Loom uses the larger rise delay for all.</p>
+so half the cells use the smaller fall delay. Jacquard uses the larger rise delay for all.</p>
 <p><strong>Measured</strong>: 80ps overestimate on 1235ps (6.5%) for 16 inverters with ~10ps rise/fall
 asymmetry per cell.</p>
 <h3 id="source-2-max-wire-delay-across-all-input-pins"><a class="header" href="#source-2-max-wire-delay-across-all-input-pins">Source 2: max wire delay across all input pins</a></h3>
 <p>For multi-input cells (AND gates, MUXes), INTERCONNECT delays to different input pins
-may differ significantly. Loom takes the maximum across all input pins:</p>
+may differ significantly. Jacquard takes the maximum across all input pins:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// wire_delays_per_cell: dest_cellid → max(all input wire delays)
@@ -409,14 +409,14 @@ entry.rise_ps = entry.rise_ps.max(ic.delay.rise_ps);
 entry.fall_ps = entry.fall_ps.max(ic.delay.fall_ps);
 <span class="boring">}</span></code></pre></pre>
 <p><strong>Impact</strong>: If an AND gate has input A arriving via a 10ps wire and input B via a
-200ps wire, Loom assigns 200ps to the cell regardless of which input is on the
+200ps wire, Jacquard assigns 200ps to the cell regardless of which input is on the
 critical path. An event-driven simulator would correctly propagate the 10ps arrival
 on input A independently.</p>
 <p><strong>When this matters</strong>: Designs with highly asymmetric routing (e.g., one input is
 local, another crosses the chip). Well-routed designs typically have balanced wire
 delays to multi-input cells.</p>
 <h3 id="source-3-max-arrival-across-32-packed-signals-per-thread"><a class="header" href="#source-3-max-arrival-across-32-packed-signals-per-thread">Source 3: max arrival across 32 packed signals per thread</a></h3>
-<p>Each thread position holds 32 independent Boolean signals. Loom tracks one arrival
+<p>Each thread position holds 32 independent Boolean signals. Jacquard tracks one arrival
 per thread position (the maximum across all 32 signals):</p>
 <pre><code>Thread 50: [signal_A: 5ps, signal_B: 23ps, signal_C: 8ps, ...]
 Tracked:   arrival[50] = 23ps (max of all 32)
@@ -442,7 +442,7 @@ mitigation.</p>
 <p>The inv_chain design (2 DFFs + 16 SKY130 inverters) was validated against CVC
 (open-src-cvc), an event-driven Verilog simulator with native SDF back-annotation:</p>
 <pre><code>CVC:  clk_to_q=350ps  chain=885ps  total=1235ps  (transition-accurate)
-Loom: clk_to_q=350ps  chain=973ps  total=1323ps  (conservative max)
+Jacquard: clk_to_q=350ps  chain=973ps  total=1323ps  (conservative max)
 Difference: 88ps (7.1% overestimate)
 </code></pre>
 <p>Both simulators agree on CLK→Q delay (350ps) because the DFF has a single output
