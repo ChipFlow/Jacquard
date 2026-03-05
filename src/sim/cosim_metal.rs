@@ -35,6 +35,8 @@ pub struct CosimOpts {
     pub dump_dff: Option<std::path::PathBuf>,
     /// Number of cycles to dump DFF states (default 20).
     pub dump_dff_cycles: usize,
+    /// Enable timing-aware DFF capture gating (setup violation defers capture).
+    pub timing_capture: bool,
 }
 
 /// Result of a co-simulation run.

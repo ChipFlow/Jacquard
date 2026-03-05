@@ -1443,6 +1443,7 @@ fn cmd_cosim(args: CosimArgs) {
             timing_vcd: args.timing_vcd.clone(),
             dump_dff: args.dump_dff.clone(),
             dump_dff_cycles: args.dump_dff_cycles,
+            timing_capture: args.timing_capture,
         };
 
         let result =
