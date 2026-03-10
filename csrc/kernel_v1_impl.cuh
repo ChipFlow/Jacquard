@@ -50,6 +50,7 @@ __device__ void simulate_block_v1(
   // Timing constraint buffer: one u32 per state word, [setup_ps:16][hold_ps:16]
   const u32 *__restrict__ timing_constraints,
   u32 clock_period_ps,
+  bool timing_capture,
   EventBuffer *__restrict__ event_buffer,
   u32 cycle_i,
   i32 arrival_state_offset  // offset in output_state for arrival data (0 = disabled)
@@ -512,6 +513,26 @@ __device__ void simulate_block_v1(
     writeout_inv ^= t4_5.c3;
     // data_inv (t4_5.c3) doesn't affect X-mask (inversion preserves X)
 
+    // Timing-capture gating: if setup is violated, defer DFF capture to next cycle
+    if(timing_capture && threadIdx.x < num_ios && clken_perm != 0 && timing_constraints != nullptr) {
+      u32 constraint = timing_constraints[io_offset + threadIdx.x];
+      if(constraint != 0) {
+        u16 setup_ps = (u16)(constraint >> 16);
+        u16 arrival = shared_writeout_arrival[threadIdx.x];
+        if(arrival > 0 && (u32)arrival + (u32)setup_ps > clock_period_ps) {
+          write_event(event_buffer, EVENT_TYPE_SETUP_VIOLATION,
+                     io_offset + threadIdx.x, cycle_i,
+                     io_offset + threadIdx.x,
+                     (u32)((int)clock_period_ps - (int)arrival - (int)setup_ps),
+                     (u32)arrival, (u32)setup_ps);
+          clken_perm = 0;
+          if(is_x_capable) {
+            clken_perm_x = 0;
+          }
+        }
+      }
+    }
+
     if(threadIdx.x < num_ios) {
       u32 old_wo = input_state[io_offset + threadIdx.x];
       u32 wo = (old_wo & ~clken_perm) | (writeout_inv & clken_perm);
@@ -594,6 +615,8 @@ __global__ void simulate_v1_noninteractive_simple_scan(
 
   // Read clock period from first element of constraints buffer
   u32 clock_period_ps = (timing_constraints != nullptr) ? timing_constraints[0] : 0;
+  bool timing_capture = (clock_period_ps >> 31) != 0;
+  clock_period_ps &= 0x7FFFFFFF;
   const u32* constraints_data = (timing_constraints != nullptr) ? timing_constraints + 1 : nullptr;
 
   if(threadIdx.x < num_major_stages) {
@@ -616,6 +639,7 @@ __global__ void simulate_v1_noninteractive_simple_scan(
         shared_writeout_arrival,
         constraints_data,
         clock_period_ps,
+        timing_capture,
         event_buffer,
         (u32)cycle_i,
         arrival_state_offset
