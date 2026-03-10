@@ -13,4 +13,5 @@
 pub mod cosim_metal;
 pub mod cpu_reference;
 pub mod setup;
+pub mod timing_report;
 pub mod vcd_io;

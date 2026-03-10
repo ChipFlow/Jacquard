@@ -134,6 +134,20 @@ struct SimArgs {
     /// of sampling the late value.
     #[clap(long)]
     timing_capture: bool,
+
+    /// Write a post-simulation timing slack report (JSON) to this path.
+    ///
+    /// Requires --sdf or --liberty. Reports all DFFs exceeding the utilization
+    /// threshold, with combinational chain detail. A text summary is also
+    /// printed to stdout.
+    #[clap(long)]
+    timing_report: Option<PathBuf>,
+
+    /// Utilization threshold for timing report (0.0–1.0).
+    ///
+    /// Only DFFs with utilization >= this value are included. Default 0.8 (80%).
+    #[clap(long, default_value = "0.8")]
+    timing_report_threshold: f64,
 }
 
 #[derive(Parser)]
@@ -219,6 +233,20 @@ struct CosimArgs {
     /// Number of cycles to dump DFF states for (used with --dump-dff).
     #[clap(long, default_value = "20")]
     dump_dff_cycles: usize,
+
+    /// Write a post-simulation timing slack report (JSON) to this path.
+    ///
+    /// Requires SDF timing data (via --sdf or config.timing.sdf_file).
+    /// Reports all DFFs exceeding the utilization threshold, with
+    /// combinational chain detail. A text summary is also printed to stdout.
+    #[clap(long)]
+    timing_report: Option<PathBuf>,
+
+    /// Utilization threshold for timing report (0.0–1.0).
+    ///
+    /// Only DFFs with utilization >= this value are included. Default 0.8 (80%).
+    #[clap(long, default_value = "0.8")]
+    timing_report_threshold: f64,
 }
 
 #[derive(Parser)]
@@ -290,6 +318,17 @@ fn cmd_sim(args: SimArgs) {
         if args.sdf.is_none() && args.liberty.is_none() {
             eprintln!("Error: --timing-capture requires --sdf or --liberty");
             std::process::exit(1);
+        }
+    }
+
+    if args.timing_report.is_some() {
+        if args.sdf.is_none() && args.liberty.is_none() {
+            eprintln!("Error: --timing-report requires --sdf or --liberty");
+            std::process::exit(1);
+        }
+        // Timing report needs arrival readback from GPU
+        if !design.script.timing_arrivals_enabled {
+            design.script.enable_timing_arrivals();
         }
     }
 
@@ -450,6 +489,38 @@ fn cmd_sim(args: SimArgs) {
     #[cfg(any(feature = "metal", feature = "cuda", feature = "hip"))]
     if args.enable_timing {
         run_timing_analysis(&mut design.aig, &args);
+    }
+
+    // Post-simulation timing slack report
+    #[cfg(any(feature = "metal", feature = "cuda", feature = "hip"))]
+    if let Some(ref report_path) = args.timing_report {
+        use jacquard::sim::timing_report;
+
+        // Ensure AIG has static arrival times for chain tracing
+        if design.aig.arrival_times.is_empty() {
+            design.aig.gate_delays = design
+                .script
+                .gate_delays
+                .iter()
+                .map(|d| (d.rise_ps as u64, d.fall_ps as u64))
+                .collect();
+            design.aig.compute_timing();
+        }
+        let report = timing_report::generate_timing_report(
+            &design.script,
+            &gpu_states,
+            &design.aig,
+            &design.netlistdb,
+            design.script.clock_period_ps,
+            args.timing_report_threshold,
+        );
+        report
+            .write_text(&mut std::io::stdout())
+            .expect("Failed to write timing report to stdout");
+        report
+            .write_json(report_path)
+            .expect("Failed to write timing report JSON");
+        clilog::info!("Timing report written to {:?}", report_path);
     }
 
     // Write output VCD
@@ -1430,6 +1501,16 @@ fn cmd_cosim(args: CosimArgs) {
             std::process::exit(1);
         }
 
+        if args.timing_report.is_some() {
+            if !design.script.timing_enabled {
+                eprintln!("Error: --timing-report requires SDF timing data (via --sdf or config.timing.sdf_file)");
+                std::process::exit(1);
+            }
+            if !design.script.timing_arrivals_enabled {
+                design.script.enable_timing_arrivals();
+            }
+        }
+
         let timing_constraints = setup::build_timing_constraints(&design.script, args.timing_capture);
 
         let opts = CosimOpts {
@@ -1444,6 +1525,8 @@ fn cmd_cosim(args: CosimArgs) {
             dump_dff: args.dump_dff.clone(),
             dump_dff_cycles: args.dump_dff_cycles,
             timing_capture: args.timing_capture,
+            timing_report: args.timing_report.clone(),
+            timing_report_threshold: args.timing_report_threshold,
         };
 
         let result =

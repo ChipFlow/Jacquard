@@ -37,6 +37,10 @@ pub struct CosimOpts {
     pub dump_dff_cycles: usize,
     /// Enable timing-aware DFF capture gating (setup violation defers capture).
     pub timing_capture: bool,
+    /// Path to write a post-simulation timing slack report (JSON).
+    pub timing_report: Option<std::path::PathBuf>,
+    /// Utilization threshold for timing report (0.0–1.0).
+    pub timing_report_threshold: f64,
 }
 
 /// Result of a co-simulation run.
@@ -4196,6 +4200,52 @@ pub fn run_cosim(
         println!("SIMULATION: PASSED");
     } else {
         println!("SIMULATION: FAILED (event mismatch)");
+    }
+
+    // Post-simulation timing slack report
+    if let Some(ref report_path) = opts.timing_report {
+        if script.timing_arrivals_enabled {
+            use crate::sim::timing_report;
+
+            // Ensure AIG has static arrival times for chain tracing
+            if design.aig.arrival_times.is_empty() {
+                design.aig.gate_delays = script
+                    .gate_delays
+                    .iter()
+                    .map(|d| (d.rise_ps as u64, d.fall_ps as u64))
+                    .collect();
+                design.aig.compute_timing();
+            }
+
+            // Read final output state from GPU (one snapshot)
+            let eff = state_size;
+            let gpu_states: Vec<u32> = unsafe {
+                let ptr = states_buffer.contents() as *const u32;
+                // Output half starts at offset state_size
+                std::slice::from_raw_parts(ptr.add(eff), eff).to_vec()
+            };
+
+            let report = timing_report::generate_timing_report(
+                script,
+                &gpu_states,
+                &design.aig,
+                &design.netlistdb,
+                script.clock_period_ps,
+                opts.timing_report_threshold,
+            );
+            report
+                .write_text(&mut std::io::stdout())
+                .expect("Failed to write timing report to stdout");
+            report
+                .write_json(report_path)
+                .expect("Failed to write timing report JSON");
+            clilog::info!("Timing report written to {:?}", report_path);
+        } else {
+            clilog::warn!(
+                "--timing-report requires timing arrivals; skipping report. \
+                 Ensure SDF timing data is provided."
+            );
+        }
     }
 
     CosimResult {
