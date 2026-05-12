@@ -83,6 +83,35 @@ fn aigpdk_lib() -> std::path::PathBuf {
         .join("aigpdk/aigpdk_nomem.lib")
 }
 
+// Mirrors pyproject.toml::[tool.jacquard.pdks.sky130].volare_hash. If
+// volare is enabled at a different hash the test skips rather than
+// silently exercising the wrong PDK.
+const PINNED_SKY130_VOLARE_HASH: &str = "c6d73a35f524070e85faff4a6a9eef49553ebc2b";
+
+/// `$SKY130_LIBERTY_DIR` overrides the volare-default lookup path.
+fn find_sky130_lib_dir() -> Option<std::path::PathBuf> {
+    if let Ok(env_dir) = std::env::var("SKY130_LIBERTY_DIR") {
+        let p = std::path::PathBuf::from(env_dir);
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    let home = std::env::var_os("HOME")?;
+    let p = std::path::PathBuf::from(home)
+        .join(".volare/volare/sky130/versions")
+        .join(PINNED_SKY130_VOLARE_HASH)
+        .join("sky130A/libs.ref/sky130_fd_sc_hd/lib");
+    p.is_dir().then_some(p)
+}
+
+const SKY130_DFF_VERILOG: &str = r#"
+module sky130_dff(CLK, D, Q);
+  input CLK, D;
+  output Q;
+  sky130_fd_sc_hd__dfxtp_1 dff (.CLK(CLK), .D(D), .Q(Q));
+endmodule
+"#;
+
 #[test]
 fn aigpdk_and2_emits_two_arcs() {
     let Some(_sta) = find_opensta(None) else {
@@ -412,5 +441,113 @@ fn aigpdk_dff_emits_per_corner_timing_values() {
         let hold_indices: Vec<u32> = (0..hold.len()).map(|j| hold.get(j).corner_index()).collect();
         assert_eq!(setup_indices, vec![0, 1]);
         assert_eq!(hold_indices, vec![0, 1]);
+    }
+}
+
+/// Multi-corner with real sky130 Liberty. The companion to
+/// `aigpdk_dff_emits_per_corner_timing_values`: same shape, but loads
+/// three genuine PVT corners (typ / slow / fast) and asserts the
+/// resulting setup TimingValues actually differ across corners. Skips
+/// when sky130 isn't installed locally.
+#[test]
+fn sky130_multi_corner_emits_per_corner_values() {
+    let Some(_sta) = find_opensta(None) else {
+        eprintln!("skipping: OpenSTA not built; run scripts/build-opensta.sh");
+        return;
+    };
+
+    let Some(lib_dir) = find_sky130_lib_dir() else {
+        eprintln!(
+            "skipping: sky130 PDK not installed at expected volare path. \
+             Install with `uv sync --group dev && uv run volare enable {}`, \
+             or set $SKY130_LIBERTY_DIR to a directory containing \
+             sky130_fd_sc_hd__{{tt,ss,ff}}_*.lib files.",
+            &PINNED_SKY130_VOLARE_HASH[..8],
+        );
+        return;
+    };
+
+    let typ_lib = lib_dir.join("sky130_fd_sc_hd__tt_025C_1v80.lib");
+    let slow_lib = lib_dir.join("sky130_fd_sc_hd__ss_n40C_1v60.lib");
+    let fast_lib = lib_dir.join("sky130_fd_sc_hd__ff_n40C_1v95.lib");
+    for l in [&typ_lib, &slow_lib, &fast_lib] {
+        assert!(l.exists(), "expected Liberty at {}", l.display());
+    }
+
+    let dir = TempDir::new().unwrap();
+    let v_path = dir.path().join("sky130_dff.v");
+    let out_path = dir.path().join("sky130_dff.jtir");
+    std::fs::write(&v_path, SKY130_DFF_VERILOG).unwrap();
+
+    let output = Command::new(bin())
+        .arg("--liberty")
+        .arg(format!("typ={}", typ_lib.display()))
+        .arg("--liberty")
+        .arg(format!("slow={}", slow_lib.display()))
+        .arg("--liberty")
+        .arg(format!("fast={}", fast_lib.display()))
+        .arg("--verilog")
+        .arg(&v_path)
+        .arg("--top")
+        .arg("sky130_dff")
+        .arg("--output")
+        .arg(&out_path)
+        .output()
+        .expect("run opensta-to-ir");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}\nstdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout),
+    );
+
+    let buf = std::fs::read(&out_path).expect("output IR written");
+    let ir = root_as_timing_ir(&buf).expect("readable IR");
+
+    let corners = ir.corners().expect("corners present");
+    assert_eq!(corners.len(), 3, "expected typ + slow + fast corners");
+    assert_eq!(corners.get(0).name(), Some("typ"));
+    assert_eq!(corners.get(1).name(), Some("slow"));
+    assert_eq!(corners.get(2).name(), Some("fast"));
+
+    let checks = ir.setup_hold_checks().expect("checks present");
+    assert!(checks.len() > 0, "expected at least one DFF setup/hold");
+
+    for i in 0..checks.len() {
+        let check = checks.get(i);
+        let setup = check.setup().expect("setup vector present");
+        let hold = check.hold().expect("hold vector present");
+        assert_eq!(setup.len(), 3, "three corners → three setup TimingValues");
+        assert_eq!(hold.len(), 3, "three corners → three hold TimingValues");
+
+        assert_eq!(setup.get(0).corner_index(), 0);
+        assert_eq!(setup.get(1).corner_index(), 1);
+        assert_eq!(setup.get(2).corner_index(), 2);
+
+        let setup_typ = setup.get(0).max();
+        let setup_slow = setup.get(1).max();
+        let setup_fast = setup.get(2).max();
+
+        // Regression sentinel: dfxtp_1 has non-zero setup at every sky130 corner.
+        assert!(
+            setup_typ.abs() > 1e-9,
+            "setup at typ corner is zero — Liberty parsing regression? record {i} max={setup_typ}",
+        );
+
+        // Per-corner setup ordering — the load-bearing claim this test exists to prove.
+        assert!(
+            setup_slow > setup_fast,
+            "slow setup ({setup_slow} ps) should exceed fast setup ({setup_fast} ps) on record {i}",
+        );
+        assert!(
+            setup_slow >= setup_typ,
+            "slow setup ({setup_slow} ps) should be >= typ ({setup_typ} ps) on record {i}",
+        );
+        assert!(
+            setup_typ >= setup_fast,
+            "typ setup ({setup_typ} ps) should be >= fast ({setup_fast} ps) on record {i}",
+        );
     }
 }

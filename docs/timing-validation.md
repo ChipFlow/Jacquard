@@ -170,6 +170,38 @@ uv run ../../mcu_soc/cvc/compare_outputs.py jacquard_output.vcd cvc_output.vcd
 
 **Purpose**: Pre-layout tests catch timing issues early without P&R turnaround (30+ min). Library-only delays provide floor (lower bound); post-layout adds routing parasitics for final validation.
 
+### Multi-corner workflow (local Mac dev)
+
+**Location**: `crates/opensta-to-ir/tests/opensta_integration.rs` —
+`sky130_multi_corner_emits_per_corner_values`.
+
+The test drives `opensta-to-ir --liberty NAME=PATH` (WS2.4) three times
+with the genuine sky130 typ/slow/fast Liberty files and asserts the
+emitted timing IR carries three corners with *different* setup values
+(slow > typ > fast). This is the load-bearing check that
+`--timing-corner` actually means something — the companion
+`aigpdk_dff_emits_per_corner_timing_values` only validates IR shape.
+
+**One-time setup on a fresh Mac:**
+
+```sh
+uv sync --group dev                                     # installs volare
+uv run volare enable c6d73a35f524070e85faff4a6a9eef49553ebc2b
+# Optional override if the PDK lives elsewhere:
+export SKY130_LIBERTY_DIR=/path/to/sky130_fd_sc_hd/lib
+```
+
+The pinned volare hash lives in `pyproject.toml::[tool.jacquard.pdks.sky130]`.
+The test skips cleanly with an install hint when the PDK isn't found,
+so it's safe to run on machines without sky130 installed.
+
+**Running:**
+
+```sh
+cd crates/opensta-to-ir
+cargo test --test opensta_integration sky130_multi_corner -- --nocapture
+```
+
 ## CI Integration
 
 ### MCU SoC Timing Comparison Workflow
