@@ -48,6 +48,8 @@ pub mod gf180mcu;
 
 pub mod gf180mcu_pdk;
 
+pub mod pdk_decomp;
+
 pub mod aig;
 
 pub mod liberty_parser;
