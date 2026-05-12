@@ -1,3 +1,4 @@
 self-hosted-runner:
   labels:
     - nvidia-runner-1
+    - macos-runner-1
