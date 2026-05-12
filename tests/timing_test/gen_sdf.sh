@@ -33,7 +33,7 @@ case "$CORNER" in
 esac
 
 VOLARE_BASE="$HOME/.volare/volare/sky130/versions/c6d73a35f524070e85faff4a6a9eef49553ebc2b"
-LIB_PATH="$VOLARE_BASE/sky130B/libs.ref/sky130_fd_sc_hd/lib/$LIB_FILE"
+LIB_PATH="$VOLARE_BASE/sky130A/libs.ref/sky130_fd_sc_hd/lib/$LIB_FILE"
 
 if [ ! -f "$LIB_PATH" ]; then
     echo "Error: Liberty file not found: $LIB_PATH"

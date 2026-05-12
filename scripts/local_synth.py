@@ -41,7 +41,7 @@ def find_sky130_liberty() -> Path:
         log.error(f"No sky130 PDK found at {volare_base}")
         sys.exit(1)
     for version_dir in sorted(volare_base.iterdir()):
-        lib = version_dir / "sky130B" / "libs.ref" / "sky130_fd_sc_hd" / "lib" / "sky130_fd_sc_hd__tt_025C_1v80.lib"
+        lib = version_dir / "sky130A" / "libs.ref" / "sky130_fd_sc_hd" / "lib" / "sky130_fd_sc_hd__tt_025C_1v80.lib"
         if lib.exists():
             return lib
     log.error("sky130_fd_sc_hd liberty file not found")
