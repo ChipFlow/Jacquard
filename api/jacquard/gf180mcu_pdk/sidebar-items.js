@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {};
+window.SIDEBAR_ITEMS = {"fn":["is_delay_cell","is_filler_cell","is_multi_output_cell","is_sequential_cell","is_tie_cell"]};
