@@ -70,11 +70,15 @@ pub fn load_design(args: &DesignArgs) -> LoadedDesign {
             &SKY130LeafPins,
         )
         .expect("cannot build netlist"),
-        CellLibrary::GF180MCU => unimplemented!(
-            "GF180MCU simulation path lands in Phase 5 of \
-             docs/plans/gf180mcu-enablement.md. Timing-IR consumption via \
-             opensta-to-ir works today; full sim does not."
-        ),
+        // Phase 2 wires pin directions for GF180MCU netlist parsing.
+        // AIG construction (Phase 4 decomposition) still panics for
+        // gf180mcu cell types — that's the next sim-path blocker.
+        CellLibrary::GF180MCU => NetlistDB::from_sverilog_file(
+            &args.netlist_verilog,
+            args.top_module.as_deref(),
+            &crate::gf180mcu::GF180MCULeafPins,
+        )
+        .expect("cannot build netlist"),
         CellLibrary::AIGPDK | CellLibrary::Mixed => NetlistDB::from_sverilog_file(
             &args.netlist_verilog,
             args.top_module.as_deref(),
