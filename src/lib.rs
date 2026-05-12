@@ -23,6 +23,7 @@
 //!
 //! - [`aigpdk`] — AIGPDK standard cell library interface (AND gates, DFFs, clock gates, SRAMs)
 //! - [`sky130`] / [`sky130_pdk`] — SKY130 cell library support with Liberty timing
+//! - [`gf180mcu`] / [`gf180mcu_pdk`] — GF180MCU cell library support (7t/9t variants; in progress)
 //! - [`aig`] — And-inverter graph construction from [`netlistdb::NetlistDB`]
 //! - [`liberty_parser`] — Liberty (.lib) file parser for cell timing data
 //! - [`staging`] — Splits the AIG into pipeline stages via `--level-split` thresholds
@@ -42,6 +43,10 @@ pub mod aigpdk;
 pub mod sky130;
 
 pub mod sky130_pdk;
+
+pub mod gf180mcu;
+
+pub mod gf180mcu_pdk;
 
 pub mod aig;
 

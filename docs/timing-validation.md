@@ -202,6 +202,18 @@ cd crates/opensta-to-ir
 cargo test --test opensta_integration sky130_multi_corner -- --nocapture
 ```
 
+**GF180MCU PDK (in progress — phased per `docs/plans/gf180mcu-enablement.md`):**
+
+```sh
+uv sync --group dev
+uv run volare enable --pdk gf180mcu 559a117b163cef2f920f33f30f6f690aa0b47e4c
+```
+
+Liberty lands under `~/.volare/volare/gf180mcu/versions/<hash>/gf180mcuC/libs.ref/gf180mcu_fd_sc_mcu{7,9}t5v0/liberty/`.
+Both 7-track and 9-track standard-cell libraries are pulled together by
+volare. Cell models are vendored as submodules at
+`vendor/gf180mcu_fd_sc_mcu7t5v0/` and `vendor/gf180mcu_fd_sc_mcu9t5v0/`.
+
 ## CI Integration
 
 ### MCU SoC Timing Comparison Workflow

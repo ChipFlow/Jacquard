@@ -13,3 +13,9 @@
 [submodule "vendor/opensta"]
 	path = vendor/opensta
 	url = https://github.com/parallaxsw/OpenSTA.git
+[submodule "vendor/gf180mcu_fd_sc_mcu7t5v0"]
+	path = vendor/gf180mcu_fd_sc_mcu7t5v0
+	url = https://github.com/google/globalfoundries-pdk-libs-gf180mcu_fd_sc_mcu7t5v0.git
+[submodule "vendor/gf180mcu_fd_sc_mcu9t5v0"]
+	path = vendor/gf180mcu_fd_sc_mcu9t5v0
+	url = https://github.com/google/globalfoundries-pdk-libs-gf180mcu_fd_sc_mcu9t5v0.git
