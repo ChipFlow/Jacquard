@@ -99,6 +99,25 @@ fn locate_reports_unparseable_version_output() {
 fn locate_reports_failing_version_probe() {
     let dir = TempDir::new().unwrap();
     let stub = write_failing_stub(&dir);
+
+    // Diagnostic: confirm the stub actually runs and exits non-zero before
+    // exercising the crate. If the runner can't execute `/usr/bin/env bash`
+    // or the script is otherwise mis-spawned, this reveals it before the
+    // matches! check.
+    let direct = std::process::Command::new(&stub)
+        .arg("-version")
+        .output()
+        .expect("stub should at least spawn");
+    eprintln!(
+        "stub direct invocation: status={:?} stdout={:?} stderr={:?}",
+        direct.status,
+        String::from_utf8_lossy(&direct.stdout),
+        String::from_utf8_lossy(&direct.stderr),
+    );
+
     let err = locate_and_check(Some(&stub)).unwrap_err();
-    assert!(matches!(err, LocateError::VersionProbeNonZero { .. }));
+    match err {
+        LocateError::VersionProbeNonZero { .. } => {}
+        other => panic!("expected VersionProbeNonZero, got {other:?}"),
+    }
 }

@@ -22,7 +22,12 @@ jobs:
         with:
           submodules: false
       - name: Init required submodules
-        run: git submodule update --init vendor/eda-infra-rs vendor/sky130_fd_sc_hd
+        run: |
+          git submodule update --init \
+            vendor/eda-infra-rs \
+            vendor/sky130_fd_sc_hd \
+            vendor/gf180mcu_fd_sc_mcu7t5v0 \
+            vendor/gf180mcu_fd_sc_mcu9t5v0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -153,6 +158,9 @@ jobs:
 
       - name: Install LLVM (for OpenMP support)
         run: |
+          # Self-hosted runner's non-interactive shell doesn't inherit
+          # Homebrew on PATH; source shellenv before invoking brew.
+          eval "$(/opt/homebrew/bin/brew shellenv)"
           brew install llvm
           LLVM_PREFIX=$(brew --prefix llvm)
           echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
@@ -563,6 +571,9 @@ jobs:
 
       - name: Install LLVM (for OpenMP support)
         run: |
+          # Self-hosted runner's non-interactive shell doesn't inherit
+          # Homebrew on PATH; source shellenv before invoking brew.
+          eval "$(/opt/homebrew/bin/brew shellenv)"
           brew install llvm
           LLVM_PREFIX=$(brew --prefix llvm)
           echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
