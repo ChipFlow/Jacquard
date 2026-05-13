@@ -1,6 +1,10 @@
 # Plan — GF180MCU PDK enablement (full sim path)
 
-**Status:** Proposed. No code landed yet.
+**Status:** Phases 0–6 shipped (2026-05-12 / 13). Phase 7
+(wafer.space test-run-1 design integration) deferred pending design
+availability. This document is now a recap of what landed; the
+forward-looking deferred items are in § Follow-on cleanup at the
+bottom.
 
 **Predecessors:**
 - SKY130 enablement (reference recipe in `docs/adding-a-pdk.md`).
@@ -8,25 +12,29 @@
   integration test (`crates/opensta-to-ir/tests/opensta_integration.rs`),
   shipped 2026-05-12.
 
-**ADRs:** None new expected. `docs/adding-a-pdk.md` is the canonical
-integration-points checklist; this plan applies that recipe to GF180MCU
-with both 7-track (`gf180mcu_fd_sc_mcu7t5v0`) and 9-track
+**ADRs:** None new shipped. `docs/adding-a-pdk.md` is the canonical
+integration-points checklist; this plan applied that recipe to
+GF180MCU with both 7-track (`gf180mcu_fd_sc_mcu7t5v0`) and 9-track
 (`gf180mcu_fd_sc_mcu9t5v0`) standard-cell libraries.
 
-## Goal
+## Goal (as shipped)
 
-Bring GF180MCU to the same support tier as SKY130:
+GF180MCU is now at the same support tier as SKY130:
 
 1. **Timing path** — `opensta-to-ir` accepts GF180MCU Liberty files
-   and emits IR; consumers (jacquard sim with `--timing-ir`) resolve
-   per-corner setup/hold/arrival values correctly.
-2. **Simulation path** — `jacquard sim` runs a gate-level GF180MCU
-   netlist on the GPU. Requires cell-type detection, pin direction
-   tables, sequential/tie/multi-output classification, behavioral
-   model parsing, and AIG decomposition rules.
-3. **Validation** — at minimum a tiny synthetic GF180 DFF+inverter
-   fixture mirroring `tests/timing_test/sky130_timing/`; ideally a
-   real wafer.space test-run-1 design once one is in hand.
+   and emits IR; the multi-corner integration test at
+   `crates/opensta-to-ir/tests/opensta_integration.rs::gf180mcu_multi_corner_emits_per_corner_values`
+   asserts per-corner setup/hold values differ correctly across
+   tt/ss/ff PVT corners.
+2. **Simulation path** — `jacquard sim` runs gate-level GF180MCU
+   netlists on the GPU. Cell-type detection, pin direction tables,
+   sequential/tie/multi-output classification, behavioural model
+   parsing (with UDP support for sequential elements), and AIG
+   decomposition are all wired through `AIG::from_netlistdb`.
+3. **Validation** — synthetic DFF+inverter fixture at
+   `tests/timing_test/gf180mcu_timing/`. Real wafer.space test-run-1
+   design integration is deferred (Phase 7, gated on design
+   availability).
 
 End state mirrors today's SKY130 support: `CellLibrary::GF180MCU`
 detected, decomposed to AIG, simulated on Metal/CUDA/HIP, with a
@@ -34,28 +42,13 @@ golden-IR corpus entry covering the timing-IR side.
 
 ## Why now
 
-GF180MCU support is a release prerequisite per session 2026-05-12. The
-wafer.space ecosystem (https://github.com/wafer-space/gf180mcu) is the
-near-term commercial demand driver; the upstream
+GF180MCU support was a release prerequisite per session 2026-05-12.
+The wafer.space ecosystem (https://github.com/wafer-space/gf180mcu)
+is the near-term commercial demand driver; the upstream
 [google/gf180mcu-pdk](https://github.com/google/gf180mcu-pdk) is the
 canonical PDK that the wafer.space variant builds on.
 
-## Surface analysis — what SKY130 looks like
-
-| File | Lines | Purpose |
-|---|---|---|
-| `src/sky130.rs` | 793 | `CellLibrary` enum, library detection, cell-type extraction, `SKY130LeafPins` pin provider |
-| `src/sky130_pdk.rs` | 1,654 | Cell classification (sequential, tie, multi-output), behavioral-model parser, AIG decomposition rules |
-| `src/aig.rs` | (touched) | `get_sky130_dependencies()`, `sky130_preprocess()`, `sky130_postprocess()` hooks |
-| `src/bin/jacquard.rs` | (touched) | CLI match arms |
-| `vendor/sky130_fd_sc_hd/` | submodule | Behavioral Verilog cell models |
-
-Total: ~2,447 LOC of new Rust + a vendored submodule. SKY130 detection
-covers seven name-prefix variants (hd/hs/ms/ls/lp/hdll/hvl) under a
-single `CellLibrary::SKY130` enum value, but only `sky130_fd_sc_hd` is
-vendored and fully decomposed.
-
-## Decisions made (2026-05-12 session)
+## Decisions (frozen 2026-05-12 session)
 
 1. **One enum variant for GF180MCU.** `CellLibrary::GF180MCU` covers
    both 7t5v0 and 9t5v0 prefixes. Matches the SKY130 precedent
@@ -63,242 +56,208 @@ vendored and fully decomposed.
 2. **Both 7t and 9t fully supported.** Unlike SKY130 (only hd is
    decomposed), both GF180MCU standard-cell variants are first-class
    for cell detection, pin direction, classification, and AIG
-   decomposition. The user expects designs to span both.
+   decomposition. Cell models for 7t and 9t are byte-identical per
+   cell type (verified at build time in `build.rs`); decomposition
+   reads from the 7t submodule and reuses for 9t.
 3. **Two separate submodules** for vendoring cell models, mirroring
    the per-library SKY130 split:
    - `vendor/gf180mcu_fd_sc_mcu7t5v0/`
    - `vendor/gf180mcu_fd_sc_mcu9t5v0/`
-   Submodule URLs TBD at Phase 0; either Google ships per-library repos
-   (as it does for sky130: `skywater-pdk-libs-sky130_fd_sc_hd`) or we
-   pin sub-trees of `google/gf180mcu-pdk`.
-4. **Install path:** `volare` already supports `--pdk gf180mcu`; pin a
-   single hash under `[tool.jacquard.pdks.gf180mcu]` in
-   `pyproject.toml` alongside the existing sky130 entry.
-5. **Phasing:** seven phases, each landing as a self-contained commit
-   that can be reviewed in isolation. See § Phase breakdown.
-6. **wafer.space test-run-1 design** — Phase 7, sequenced after the
-   minimum-viable synthetic fixture in Phase 6. Designs and source
-   TBD pending availability.
+4. **Install path:** `volare` pinned hash under
+   `[tool.jacquard.pdks.gf180mcu]` in `pyproject.toml` alongside the
+   existing sky130 entry. Variant: `gf180mcuC`.
+5. **Reset polarity:** GF180MCU uses **active-low** resets/sets
+   (pin names `RN`, `SETN`) — same AIG formula shape as SKY130's
+   `RESET_B`/`SET_B`. The "n" *prefix* in cell names like
+   `dffnq`/`dffnrnq`/`icgtn` indicates a **negative-edge clock**
+   (pin `CLKN`), not reset polarity (resolving Open Q3 from the
+   original plan).
 
-## Phase breakdown
+## Shipped phases
 
-Each phase is one commit unless explicitly split. LOC estimates are
-ceilings — actual cell counts may shrink them. Predecessor arrows
-indicate hard ordering.
+### Phase 0 — Foundations (commit `6ae3e54`)
 
-### Phase 0 — Foundations
+- `pyproject.toml`: `[tool.jacquard.pdks.gf180mcu]` with
+  `volare_hash = "559a117b163cef2f920f33f30f6f690aa0b47e4c"`, variant
+  `gf180mcuC`, separate `default_lib_subdir_7t` /
+  `default_lib_subdir_9t` paths.
+- Vendored submodules at `vendor/gf180mcu_fd_sc_mcu7t5v0/` and
+  `vendor/gf180mcu_fd_sc_mcu9t5v0/`.
+- Skeleton `src/gf180mcu.rs` + `src/gf180mcu_pdk.rs` declared in
+  `src/lib.rs`.
 
-**Deliverables:**
-- `pyproject.toml`: add `[tool.jacquard.pdks.gf180mcu]` table with
-  pinned volare hash + variant metadata. Document the install command
-  in `docs/timing-validation.md`.
-- Two new submodules at `vendor/gf180mcu_fd_sc_mcu7t5v0/` and
-  `vendor/gf180mcu_fd_sc_mcu9t5v0/`. Pinned at a known-stable tag.
-- Skeleton `src/gf180mcu.rs` + `src/gf180mcu_pdk.rs` with module-level
-  doc comments and `#[allow(unused)]` stubs. No real logic.
-- Module declarations in `src/lib.rs`.
+### Phase 1 — Library detection + cell-type extraction (commit `858dd70`)
 
-**Estimated LOC:** ~100 + submodule pins + this plan doc.
+- `is_gf180mcu_cell(name) -> bool` matching both 7t5v0 and 9t5v0
+  prefixes.
+- `extract_cell_type(name)` strips prefix + drive suffix.
+- `CellLibrary::GF180MCU` enum value added; `detect_library()` /
+  `detect_library_from_file()` extended; `Mixed` enforcement
+  upgraded to three known libraries.
 
-**Exit criteria:** `cargo build` clean; submodules initialised;
-`uv run volare enable --pdk gf180mcu <hash>` succeeds locally and the
-test helper finds the Liberty.
+### Phase 2 — Pin direction provider (commit `e97e2d2`)
 
----
+- `GF180MCULeafPins` implementing `LeafPinProvider`.
+- Generation strategy: **build-time** via `build.rs::generate_gf180mcu_pin_table`,
+  which scans `vendor/gf180mcu_fd_sc_mcu{7,9}t5v0/cells/`, parses
+  `.functional.v`, cross-asserts 7t/9t pin layouts match, emits
+  `$OUT_DIR/gf180mcu_pins.rs`. New precedent vs SKY130's
+  hand-rolled match arms (see § Follow-on cleanup item 1).
+- Round-trip test instantiating every cell.
 
-### Phase 1 — Library detection + cell-type extraction
-**Predecessors:** Phase 0.
+### Phase 3 — Cell classification (commit `6969b90`)
 
-**Deliverables:**
-- `is_gf180mcu_cell(name) -> bool` in `src/gf180mcu.rs` matching both
-  `gf180mcu_fd_sc_mcu7t5v0__` and `gf180mcu_fd_sc_mcu9t5v0__` prefixes
-  (and `gf180mcu_fd_io__` / `gf180mcu_fd_pr__` if needed for IO/primitives).
-- `extract_cell_type(name)` strips the matching prefix and the drive
-  suffix, returning the base cell type. Unit tests covering both
-  variants.
-- `CellLibrary::GF180MCU` enum value in `src/sky130.rs` (or moved out
-  to a neutral location if the enum is renamed — see § Open questions).
-- `detect_library()` + `detect_library_from_file()` extended to
-  recognise GF180MCU; `Mixed` enforcement updated for three known
-  libraries.
-
-**Estimated LOC:** ~200, ~80% tests.
-
----
-
-### Phase 2 — Pin direction provider
-**Predecessors:** Phase 1, Phase 0's vendored submodules.
-
-**Deliverables:**
-- `GF180MCULeafPins` struct in `src/gf180mcu.rs` implementing
-  `LeafPinProvider`. Returns `Direction` (Input/Output) and pin
-  widths for every cell type across both 7t5v0 and 9t5v0.
-- Generation strategy: scripted extraction from the behavioural
-  Verilog models in the submodules, cross-checked against Liberty
-  pin metadata. Generate at build time via `build.rs`. Sky130 takes
-  the "commit the table" path, and should be updated to same
-  mechanism after this work.
-- Round-trip test: parse a synthetic netlist instantiating every
-  cell, confirm no unknown-pin errors.
-
-**Estimated LOC:** ~400 (mostly mechanical pin tables).
-
----
-
-### Phase 3 — Cell classification
-**Predecessors:** Phase 2.
-
-**Deliverables:**
-- Sequential-cell whitelist in `src/gf180mcu_pdk.rs`:
-  `is_sequential_cell()`. Derived from behavioral models — do not
-  prefix-match (per the SKY130 lesson re `dlygate4sd3`).
-- Tie cells, multi-output cells, hold-time repair buffers identified.
-- Reset polarity convention recorded. GF180MCU appears to follow the
-  active-high reset convention rather than SKY130's active-low — to
-  be confirmed during implementation.
+- Sequential / tie / filler / delay-cell whitelists in
+  `src/gf180mcu_pdk.rs` derived from behavioural models.
 - Unit tests asserting classification across the union of 7t5v0 and
   9t5v0 cell catalogues.
 
-**Estimated LOC:** ~300.
+### Phase 4 — Combinational AIG decomposition
 
----
+Sequenced as four commits:
 
-### Phase 4 — AIG decomposition
-**Predecessors:** Phase 3. **Biggest commit; may split.**
+- `92bb665` — Phase 4 recon: confirmed SKY130 behavioural parser is
+  PDK-neutral; identified shared infrastructure that
+  `gf180mcu_pdk` could reuse.
+- `02da077` — Phase 4 prep: introduced the PDK-neutral
+  `src/pdk_decomp.rs` re-export module; exposed `WireVal`,
+  `GATE_MARKER`, `build_chain_gate`, `build_xor_chain`,
+  `finalize_decomp_result` as `pub(crate)`.
+- `32fb3b9` — Phase 4 (combinational): `decompose_combinational` for
+  GF180MCU + boolean equivalence test suite vs the vendored PDK
+  models.
+- `d898343` — Phase 4 (aig.rs integration): wired combinational
+  decomposition through `AIG::from_netlistdb`, end-to-end sim path
+  for combinational GF180MCU netlists.
 
-**Deliverables:**
-- Behavioral-model parser pulling functional definitions from the
-  vendored Verilog (or Liberty) cell models — mirrors
-  `parse_functional_model` in `src/sky130_pdk.rs`.
-- AIG decomposition rules for every standard-cell type
-  (`decompose_with_pdk` equivalent): NAND/NOR/AOI/OAI/inverters/buffers,
-  DFFs with various enable/reset combinations.
-- Test `test_all_cells_vs_pdk` covering both variants. Sample-based
-  exhaustive boolean equivalence — same as SKY130's regression.
+### Phase 4b — Sequential cells (UDPs)
 
-**Estimated LOC:** ~1,200. Likely split into Phase 4a (parser + simple
-gates) and Phase 4b (complex AOI/OAI + sequential decomposition) if
-review pressure demands.
+- `a7c0618` — Phase 4b prep: UDP loader for `gf180mcu_pdk`
+  (parses `UDP_GF018hv5v_mcu_sc7_TT_1P8V_25C_verilog_nonpg_*_FF_UDP`
+  and friends from the vendored PDK).
+- `459317e` — Phase 4b: AIG hooks for sequential cells (DFFs,
+  latches, scan-DFFs, clock-gating cells `icgtp`/`icgtn`).
+  `gf180mcu_preprocess` pre-creates DFF Q pins; `gf180mcu_postprocess`
+  applies async set/reset using the active-low RN/SETN convention
+  via the same AIG formula as SKY130. Negative-edge clock cells
+  use `CLKN` instead of `CLK` (handled in `trace_clock_pin`).
+- `3006f59` — Phase 4b boolean-equivalence tests covering DFF,
+  latch, scan-DFF, and clock-gating cells via multi-step
+  truth-table evaluation.
 
----
+### Phase 5 — CLI / pipeline wiring audit (commit `57244d5`)
 
-### Phase 5 — AIG hooks + CLI wiring
-**Predecessors:** Phase 4.
+Audit-only — no per-PDK branch was missing GF180MCU handling. The
+auto-detection in `AIG::from_netlistdb` already covers every CLI
+surface (`sim` / `cosim` / `dump-paths` all route through
+`setup::load_design`). Cleanup: stale Phase 4b panic comments in
+`src/sim/setup.rs` and `src/aig.rs`; field doc comments on CLI
+arguments refreshed to mention GF180MCU alongside AIGPDK / SKY130.
 
-**Deliverables:**
-- `src/aig.rs`: `get_gf180mcu_dependencies()`,
-  `gf180mcu_preprocess()`, `gf180mcu_postprocess()` (where needed —
-  some PDKs need none).
-- `src/bin/jacquard.rs`: CLI match arms for `CellLibrary::GF180MCU`
-  in the sim / map / cosim paths. Default TimingLibrary loader for
-  the typical corner.
+### Phase 6 — Validation fixture + multi-corner test
 
-**Estimated LOC:** ~150.
-
----
-
-### Phase 6 — Validation
-**Predecessors:** Phase 5.
-
-**Deliverables:**
-- Tiny GF180MCU DFF+inverter chain fixture in
-  `tests/timing_test/gf180mcu_timing/` mirroring
-  `sky130_timing/`. Liberty-only SDF generation script.
-- `gf180mcu_multi_corner_emits_per_corner_values` integration test in
-  `crates/opensta-to-ir/tests/opensta_integration.rs`. Uses 7t5v0
-  Liberty (or 9t5v0 — pick one for the initial pass) across typ/slow/
-  fast corners. Same shape as the sky130 test.
-- Optional: corpus entry under `tests/timing_ir/corpus/` once the
-  install strategy for non-vendored Liberty is finalised. This is
-  the same blocker that gates `inv_chain_pnr`.
-
-**Estimated LOC:** ~300 plus a small fixture.
-
----
+- **Fixture** (commit `4a7ee0e`): `tests/timing_test/gf180mcu_timing/`
+  mirroring `sky130_timing/` 1:1. Synthetic `inv_chain.v` (DFF +
+  16-inverter chain + DFF) with `gf180mcu_fd_sc_mcu7t5v0__{dffq,inv}_1`
+  cells, Liberty-only SDF generator, CVC testbench, sample stimulus,
+  Makefile, README.
+- **Integration test**: `gf180mcu_multi_corner_emits_per_corner_values`
+  in `crates/opensta-to-ir/tests/opensta_integration.rs`. Loads
+  three real PVT corners (typ=`tt_025C_5v00`, slow=`ss_125C_4v50`,
+  fast=`ff_n40C_5v50`) at the 5.0 V operating point and asserts
+  per-corner setup TimingValues differ correctly across PVT.
+  Skips gracefully when the volare-installed PDK isn't present
+  (gated on `find_gf180mcu_lib_dir()` returning `Some`; matches
+  the sky130 test's skip pattern). `$GF180MCU_LIBERTY_DIR` overrides
+  the volare default path.
 
 ### Phase 7 — wafer.space test-run-1 design (deferred)
-**Predecessors:** Phase 6; gated on design availability.
 
-**Deliverables:**
-- Vendor or pull a wafer.space test-run-1 gate-level netlist into the
-  `tests/timing_test/` or `designs/` tree (location TBD based on
-  size and license).
-- End-to-end pipeline: synth + PnR (or just consume the post-PnR
-  output if wafer.space ships it), opensta-to-ir, jacquard sim with
-  Metal backend, golden-output VCD comparison.
+Gated on design availability. Scope:
+
+- Vendor or pull a wafer.space test-run-1 gate-level netlist into
+  the `tests/timing_test/` or `designs/` tree.
+- End-to-end pipeline: synth + PnR (or consume post-PnR output),
+  opensta-to-ir, jacquard sim with Metal backend, golden-output
+  VCD comparison.
 - Promote to a corpus entry once stable.
 
-Scope and LOC are TBD until the design is in hand.
+## Test inventory
 
-## Open questions
+Counts after Phase 6:
 
-1. **Submodule URLs.** Does Google ship `gf180mcu_fd_sc_mcu7t5v0` and
-   `gf180mcu_fd_sc_mcu9t5v0` as separate `google/gf180mcu-pdk-libs-*`
-   repos (the sky130 model), or are they only available as
-   subdirectories of `google/gf180mcu-pdk`? If the latter, vendoring
-   each as a `git subtree` of the umbrella may be cleaner than
-   submodules. **Resolve at Phase 0.**
+- `cargo test --lib`: **212 passing** (up from 166 at plan start).
+- `cargo test --lib gf180mcu`: **45 passing** (combinational + sequential
+  equivalence + classification + detection + AIG-build).
+- `cargo test -p opensta-to-ir multi_corner`: **2 passing** (sky130 +
+  gf180mcu), each gated on its respective volare PDK install.
 
-2. **`CellLibrary` enum location.** It currently lives in
-   `src/sky130.rs` even though it represents all PDKs. Moving it to a
-   neutral home (`src/pdk.rs` or `src/lib.rs`) is in scope of a small
-   refactor; keep that out of the GF180 plan unless a Phase 1 conflict
-   forces the issue. **Defer unless forced.**
+## Follow-on cleanup
 
-3. **Reset polarity.** GF180MCU's DFF cells likely use active-high
-   reset (the opposite of SKY130's `RESET_B`). Confirm at Phase 3;
-   add a `dff_reset_active_low()` trait or per-PDK constant if both
-   conventions need first-class support.
+These are nice-to-have refactors flagged during the GF180MCU work
+but deliberately out of scope for the enablement effort itself:
+
+1. **`build.rs` pin-table generator for SKY130 too.** `build.rs::
+   generate_gf180mcu_pin_table` is a new precedent — scan +
+   parse + cross-assert. SKY130 still uses hand-rolled match arms
+   in `src/sky130.rs`. Porting SKY130 to the same mechanism would
+   remove ~200 LOC of mechanically-maintained tables.
+
+2. **Physical relocation of shared PDK decomp infrastructure** out
+   of `sky130_pdk.rs` into `pdk_decomp.rs`. Phase 4 satisfied this
+   via re-exports + visibility bumps to `pub(crate)`; the real move
+   is deferred until a third PDK exercises the API surface.
+
+3. **`CellLibrary` enum location.** Currently lives in `src/sky130.rs`
+   even though it represents all PDKs. Moving to a neutral home
+   (`src/pdk.rs` or `src/lib.rs`) is a trivial mechanical refactor.
 
 4. **IO and PR libraries.** `gf180mcu_fd_io` (pads, levelshifters)
-   and `gf180mcu_fd_pr` (primitives — diodes, R/C, antenna cells) are
-   present in real post-P&R netlists. Treat them like
-   `tap`/`fill`/`decap` cells (recognised but stubbed) until the
-   wafer.space test-run-1 design forces a richer model.
+   and `gf180mcu_fd_pr` (primitives — diodes, R/C, antenna cells)
+   appear in real post-P&R netlists. Treated like `tap`/`fill`/`decap`
+   today (recognised but stubbed); will need richer modelling when
+   wafer.space test-run-1 designs arrive (Phase 7).
 
-5. **9t5v0 cell coverage.** The 9t library may have cells that 7t
-   doesn't (different drive strengths, alternate footprints).
-   Validate cell-name lists are union-compatible at Phase 2.
+5. **CI install strategy for GF180MCU Liberty.** Both the sky130 and
+   gf180mcu multi-corner tests currently skip when the PDK isn't
+   installed locally. CI integration (volare-on-CI or a vendored
+   minimal Liberty subset) is the same blocker that gates the
+   `inv_chain_pnr` sky130 corpus entry — out of scope for the GF180
+   enablement effort itself.
 
-6. **CI install strategy.** Same blocker as the sky130 corpus entry
-   (handoff §5). The local-dev test path works today via volare; CI
-   integration follows when the GPU-runner work resumes.
+## Pitfalls (PDK-specific, for future readers)
 
-## Pitfalls (PDK-specific)
-
-Carried forward from `docs/adding-a-pdk.md` § Common Pitfalls, with
-GF180MCU-specific calls:
-
-- **Reset polarity** — see Open Q3.
+- **Reset polarity** — GF180MCU is active-low (`RN`/`SETN`); same
+  AIG formula as SKY130's `RESET_B`/`SET_B`.
+- **Negative-edge clocks** — cells like `dffnq`/`dffnrnq`/`icgtn`
+  use pin name `CLKN` instead of `CLK`. The "n" prefix is a clock
+  marker, not a reset-polarity marker.
 - **Power pins** — GF180MCU operates at 5V nominal (vs SKY130's
-  1.8V). Both follow VDD/VSS naming, but Liberty parameter ranges
-  differ. Make sure the corner naming (`tt_025C_5v00` etc.) maps
-  cleanly through the existing TimingLibrary loader.
-- **Cell name collisions** between 7t5v0 and 9t5v0 — both have
-  `nand2_1` etc. Detection must key on the full prefix, not the base
-  type.
-- **Drive-strength suffix differences.** SKY130 uses integer
-  multipliers (`inv_1`, `inv_2`, `inv_4`). GF180MCU appears to follow
-  the same convention but verify against the actual cell names in
-  the submodule.
-
-## Migration / cleanup at completion
-
-- Plan doc resolves: fold the closed phases' content into the
-  `docs/adding-a-pdk.md` reference (or into a `docs/pdk-support.md`
-  index) as a worked second example. Delete this plan doc.
-- `CellLibrary::Mixed` semantics extended to three libraries — verify
-  no callers assume binary AIGPDK/SKY130 only.
-- Submodule pins recorded in `docs/release-process.md` § License
-  posture (both gf180mcu libraries are Apache-2.0 upstream).
+  1.8V). Both follow VDD/VSS naming. Corner names follow
+  `tt_025C_5v00` shape and parse cleanly through the generic
+  `TimingLibrary` loader.
+- **Cell pin names differ from SKY130** — inverter is `I`/`ZN`
+  (not `A`/`Y`); DFF is `CLK`/`D`/`Q`/`notifier`. The `notifier`
+  port wires the UDP delay-model wrapper but is unused for logic
+  simulation.
+- **Cell-name collisions** between 7t5v0 and 9t5v0 — both have
+  `nand2_1` etc. Detection keys on the full prefix, not the base
+  type. Auto-handled by `is_gf180mcu_cell`.
+- **Drive-strength suffixes** — GF180MCU uses integer multipliers
+  (`inv_1`, `inv_2`, `inv_4`, …) matching the SKY130 convention.
 
 ## Links
 
-- `docs/adding-a-pdk.md` — canonical recipe (SKY130 reference).
-- `src/sky130.rs`, `src/sky130_pdk.rs` — the reference implementation.
-- `crates/opensta-to-ir/tests/opensta_integration.rs::sky130_multi_corner_emits_per_corner_values`
-  — the timing-side validation pattern to mirror in Phase 6.
-- `pyproject.toml::[tool.jacquard.pdks.sky130]` — install-pin
-  pattern to mirror.
+- `docs/adding-a-pdk.md` — canonical PDK integration recipe.
+- `src/sky130.rs`, `src/sky130_pdk.rs` — SKY130 reference
+  implementation.
+- `src/gf180mcu.rs`, `src/gf180mcu_pdk.rs` — GF180MCU
+  implementation.
+- `crates/opensta-to-ir/tests/opensta_integration.rs::{sky130,gf180mcu}_multi_corner_emits_per_corner_values`
+  — timing-side validation.
+- `tests/timing_test/{sky130,gf180mcu}_timing/` — synthetic
+  fixtures.
+- `pyproject.toml::[tool.jacquard.pdks.{sky130,gf180mcu}]` —
+  install pins.
 - Upstream PDK: https://github.com/google/gf180mcu-pdk
 - wafer.space variant: https://github.com/wafer-space/gf180mcu

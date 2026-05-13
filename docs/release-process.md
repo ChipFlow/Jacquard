@@ -82,24 +82,43 @@ These items are tracked in [`docs/plans/post-phase-0-roadmap.md`](plans/post-pha
 
 - [x] Phase 1 (ADR 0008 required outputs) closed.
 - [x] WS-RH.1 (OpenSTA detection + version check) shipped.
-- [ ] All three GPU CI jobs green on main (currently disabled awaiting
-      runner restoration; see `.github/workflows/ci.yml`).
+- [x] Metal CI on `macos-runner-1` green (re-enabled in commit `12e98df`,
+      2026-05-12).
+- [ ] **CUDA CI** on `nvidia-runner-1` green on main. Currently
+      disabled in `.github/workflows/ci.yml` (`if: ${{ false }}`,
+      ~line 268). Re-enable when hardware lands.
+- [ ] **HIP CI** on the AMD runner green on main. Currently disabled
+      in `.github/workflows/ci.yml` (`if: ${{ false }}`, ~line 357).
+      Re-enable when the AMD runner is online.
 - [x] Vendored-dep license posture confirmed
       ([gzz2000/eda-infra-rs#2](https://github.com/gzz2000/eda-infra-rs/issues/2#issuecomment-4363789319)
       — sverilogparse AGPL declaration acknowledged as a typo; workspace
       Apache-2.0 governs).
 - [x] `Cargo.toml::license = "Apache-2.0"` set.
 - [x] `NOTICE` file enumerating vendored deps + their licenses.
-- [ ] Bump `vendor/eda-infra-rs` submodule once upstream pushes the
+- [ ] **Bump `vendor/eda-infra-rs` submodule** once upstream pushes the
       sverilogparse `Cargo.toml` correction; remove the corresponding
-      footnote in `NOTICE`.
-- [ ] CUDA / HIP runtime violation routing through `process_events`
-      (or document loudly that `--timing-report` is Metal-only at
-      release time).
+      footnote in `NOTICE`. Maintainer acknowledged the typo on
+      2026-05-02 but hasn't pushed the fix as of 2026-05-13. Verify
+      with `git -C vendor/eda-infra-rs fetch && git log origin/master --oneline`.
+- [ ] **CUDA / HIP runtime violation routing** through
+      `process_events` (or document loudly that `--timing-report` is
+      Metal-only at release time). `sim_cuda` / `sim_hip` accept
+      `timing_constraints` but currently call the simple-scan path
+      instead of the timed-batched path. Blocked on the same GPU
+      runners as the CUDA/HIP CI jobs above.
 - [x] Bounded violations array (`--timing-report-max-violations`,
       default 100k).
-- [ ] End-to-end test exercising `--timing-report` against a corpus
-      design.
+- [ ] **End-to-end `--timing-report` test on Metal CI.** Now
+      unblocked: `macos-runner-1` is live and the sky130 multi-corner
+      test passes there. Wire a small `--timing-report` test against
+      `benchmarks/dataset/nvdla*` (or any small corpus design) in
+      the `metal` CI job; validate the JSON shape against
+      `tests/timing_ir/sample_reports/two_violations.json`.
+- [x] GF180MCU enablement (Phases 0–6) shipped. See
+      `docs/plans/gf180mcu-enablement.md`. Phase 7 (wafer.space
+      test-run-1 design integration) deferred pending design
+      availability; not release-blocking.
 
 ## License posture
 
