@@ -25,5 +25,7 @@ gpu_events.json
 !dff_test_synth.gv
 !sky130_timing/*.v
 !sky130_timing/*.vcd
+!gf180mcu_timing/*.v
+!gf180mcu_timing/*.vcd
 !inv_chain_pnr/inv_chain_stimulus.vcd
 !multi_depth/multi_depth_stimulus.vcd
