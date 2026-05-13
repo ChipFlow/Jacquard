@@ -502,11 +502,18 @@ impl AIG {
             let mut pin_en = usize::MAX;
             let celltype = netlistdb.celltypes[cellid].as_str();
 
-            // Determine if this is a clock buffer/inverter (AIGPDK or SKY130)
+            // Determine if this is a clock buffer/inverter (AIGPDK / SKY130 / GF180MCU).
+            // GF180MCU `inv` / `clkinv` are negative-polarity; `buf` / `clkbuf` are
+            // identity. GF180MCU clock-path cells use input pin name `I` rather
+            // than `A`; we accept both below.
             let is_inv = celltype == "INV"
                 || (is_sky130_cell(celltype) && {
                     let ct = extract_cell_type(celltype);
                     ct.starts_with("inv") || ct.starts_with("clkinv")
+                })
+                || (is_gf180mcu_cell(celltype) && {
+                    let ct = crate::gf180mcu::extract_cell_type(celltype);
+                    matches!(ct, "inv" | "clkinv")
                 });
             let is_buf = celltype == "BUF"
                 || (is_sky130_cell(celltype) && {
@@ -516,11 +523,15 @@ impl AIG {
                         || ct.starts_with("clkdlybuf")
                         || ct.starts_with("lpflow_isobufsrc")
                         || ct.starts_with("lpflow_inputiso")
+                })
+                || (is_gf180mcu_cell(celltype) && {
+                    let ct = crate::gf180mcu::extract_cell_type(celltype);
+                    matches!(ct, "buf" | "clkbuf")
                 });
 
             if !is_inv && !is_buf && celltype != "CKLNQD" {
                 clilog::error!(
-                    "cell type {} not supported on clock path. expecting only INV, BUF, or CKLNQD (or SKY130 equivalents)",
+                    "cell type {} not supported on clock path. expecting only INV, BUF, or CKLNQD (or SKY130 / GF180MCU equivalents)",
                     celltype
                 );
                 return Err(pinid);
@@ -529,7 +540,8 @@ impl AIG {
             for ipin in netlistdb.cell2pin.iter_set(cellid) {
                 if netlistdb.pindirect[ipin] == Direction::I {
                     match netlistdb.pinnames[ipin].1.as_str() {
-                        "A" => pin_a = ipin,
+                        // AIGPDK / sky130 use `A`; GF180MCU buf/inv cells use `I`.
+                        "A" | "I" => pin_a = ipin,
                         "CP" => pin_cp = ipin,
                         "E" => pin_en = ipin,
                         i => {
@@ -1291,13 +1303,13 @@ impl AIG {
         }
     }
 
-    /// GF180MCU dependency-collection hook (Phase 4 combinational only).
+    /// GF180MCU dependency-collection hook.
     ///
     /// Tie cells have no dependencies. Filler/antenna/endcap cells have
-    /// no outputs in the logic graph. Sequential and clock-gating cells
-    /// panic in `gf180mcu_postprocess` until Phase 4b adds UDP handling;
-    /// here we still report their input pins as dependencies so the
-    /// topo-sort is consistent.
+    /// no outputs in the logic graph. Sequential cells depend only on
+    /// their async reset/set pins (`RN`, `SETN`) — the data/clock pins
+    /// are wired up in a separate post-DFS loop, mirroring the sky130
+    /// precedent (`SET_B`/`RESET_B`).
     fn get_gf180mcu_dependencies(
         &self,
         netlistdb: &NetlistDB,
@@ -1311,6 +1323,21 @@ impl AIG {
         {
             return SmallVec::new();
         }
+        // Sequential cells: depend on RN / SETN (active-low reset / set).
+        // Other input pins (D, CLK, CLKN, SE, SI, TE, E) are wired up in
+        // the post-DFS DFF setup loop and must NOT be dependencies of
+        // the Q output's AIG pin, otherwise we'd build a topological
+        // cycle through registered state.
+        if crate::gf180mcu_pdk::is_sequential_cell(cell_type) {
+            let mut deps = SmallVec::new();
+            for dep_pinid in netlistdb.cell2pin.iter_set(cellid) {
+                let pin_name = netlistdb.pinnames[dep_pinid].1.as_str();
+                if matches!(pin_name, "RN" | "SETN") {
+                    deps.push(dep_pinid);
+                }
+            }
+            return deps;
+        }
         let mut deps = SmallVec::new();
         for dep_pinid in netlistdb.cell2pin.iter_set(cellid) {
             if netlistdb.pindirect[dep_pinid] == Direction::I {
@@ -1321,12 +1348,15 @@ impl AIG {
     }
 
     /// GF180MCU pre-process. Tie cells set their output immediately;
-    /// everything else waits for postprocess.
+    /// sequential cells pre-allocate their Q aigpin so downstream
+    /// combinational paths can reference it before the post-DFS DFF
+    /// setup loop wires D / CLK / async S+R / scan pins; everything
+    /// else waits for postprocess.
     fn gf180mcu_preprocess(
         &mut self,
         netlistdb: &NetlistDB,
         pinid: usize,
-        _cellid: usize,
+        cellid: usize,
         celltype: &str,
     ) {
         let cell_type = crate::gf180mcu::extract_cell_type(celltype);
@@ -1339,13 +1369,26 @@ impl AIG {
                 "Expected Z output for gf180mcu tie cell, got '{output_pin_name}'",
             );
             self.pin2aigpin_iv[pinid] = if cell_type == "tieh" { 1 } else { 0 };
+            return;
+        }
+
+        // Sequential cells (DFFs, latches, clock-gating cells): pre-create
+        // a stateful Q aigpin tagged with the cell ID. The combinational
+        // reset/set overlay is applied in postprocess; the D and clock
+        // inputs are wired up in the post-DFS loop.
+        if crate::gf180mcu_pdk::is_sequential_cell(cell_type) {
+            let q = self.add_aigpin(DriverType::DFF(cellid));
+            self.aigpin_cell_origins[q].push((cellid, cell_type.to_string(), "Q".to_string()));
+            let dff = self.dffs.entry(cellid).or_default();
+            dff.q = q;
         }
     }
 
     /// GF180MCU post-process. Decomposes combinational cells via
-    /// `decompose_combinational` and stitches the resulting DecompResult
-    /// into the global AIG. Sequential / clock-gating cells panic until
-    /// Phase 4b adds UDP handling.
+    /// `decompose_with_pdk` and stitches the resulting DecompResult
+    /// into the global AIG. Sequential cells layer the active-low
+    /// async reset (`RN`) and set (`SETN`) on top of the pre-allocated
+    /// Q aigpin, using the same AIG formula as sky130 (`SET_B`/`RESET_B`).
     fn gf180mcu_postprocess(
         &mut self,
         netlistdb: &NetlistDB,
@@ -1364,12 +1407,34 @@ impl AIG {
             return;
         }
 
+        // Sequential cells: apply async RN / SETN to the pre-created Q.
+        // Polarity convention: GF180MCU RN/SETN are active-low, same
+        // semantics as sky130's RESET_B/SET_B. The AIG formula
+        //   Q_out = AND(OR(Q, NOT SETN), RN)
+        // works unchanged because:
+        //   RN=0   → AND(_, 0) = 0   (reset asserted forces Q=0)
+        //   RN=1   → AND(_, 1) = _   (RN inactive)
+        //   SETN=0 → OR(Q, NOT 0) = 1 → AND(1, RN) = RN (set asserted forces Q=1 unless RN=0)
+        //   SETN=1 → OR(Q, NOT 1) = Q (SETN inactive)
         if crate::gf180mcu_pdk::is_sequential_cell(cell_type) {
-            panic!(
-                "GF180MCU sequential / clock-gating cell '{cell_type}' decomposition \
-                 is not yet implemented (Phase 4b). \
-                 See docs/plans/gf180mcu-enablement.md."
-            );
+            let dff = self.dffs.get(&cellid).unwrap();
+            let q = dff.q;
+            let mut ap_s_iv = 1; // SETN default = 1 (inactive)
+            let mut ap_r_iv = 1; // RN default = 1 (inactive)
+            for dep_pinid in netlistdb.cell2pin.iter_set(cellid) {
+                let pin_name = netlistdb.pinnames[dep_pinid].1.as_str();
+                let prev = self.pin2aigpin_iv[dep_pinid];
+                match pin_name {
+                    "SETN" => ap_s_iv = prev,
+                    "RN" => ap_r_iv = prev,
+                    _ => {}
+                }
+            }
+            let mut q_out = q << 1;
+            q_out = self.add_and_gate(q_out ^ 1, ap_s_iv) ^ 1;
+            q_out = self.add_and_gate(q_out, ap_r_iv);
+            self.pin2aigpin_iv[pinid] = q_out;
+            return;
         }
 
         let pdk = gf180_pdk.expect(
@@ -1402,7 +1467,8 @@ impl AIG {
         }
 
         let output_pin_name = netlistdb.pinnames[pinid].1.as_str();
-        let decomp = crate::gf180mcu_pdk::decompose_combinational(model, &inputs, output_pin_name);
+        let decomp =
+            crate::gf180mcu_pdk::decompose_with_pdk(model, &inputs, output_pin_name, &pdk.udps);
 
         // Stitch the DecompResult into the global AIG — same algorithm
         // as sky130_postprocess's tail.
@@ -1554,12 +1620,16 @@ impl AIG {
         for cellid in 1..netlistdb.num_cells {
             let celltype = netlistdb.celltypes[cellid].as_str();
 
-            // Check if this is a sequential element (AIGPDK or SKY130)
+            // Check if this is a sequential element (AIGPDK / SKY130 / GF180MCU)
             let is_aigpdk_seq = matches!(celltype, "DFF" | "DFFSR" | "$__RAMGEM_SYNC_");
             let is_sky130_seq =
                 is_sky130_cell(celltype) && is_sequential_cell(extract_cell_type(celltype));
+            let is_gf180mcu_seq = is_gf180mcu_cell(celltype)
+                && crate::gf180mcu_pdk::is_sequential_cell(
+                    crate::gf180mcu::extract_cell_type(celltype),
+                );
 
-            if !is_aigpdk_seq && !is_sky130_seq {
+            if !is_aigpdk_seq && !is_sky130_seq && !is_gf180mcu_seq {
                 continue;
             }
 
@@ -1582,15 +1652,21 @@ impl AIG {
             }
             for pinid in netlistdb.cell2pin.iter_set(cellid) {
                 let pin_name = netlistdb.pinnames[pinid].1.as_str();
-                // Both AIGPDK and SKY130 use "CLK" for clock pins
-                if !matches!(pin_name, "CLK" | "PORT_R_CLK" | "PORT_W_CLK") {
+                // AIGPDK/SKY130 sequentials use "CLK"; GF180MCU adds "CLKN"
+                // for negative-edge cells (`dffnq`, `dffnrnq`, `icgtn`, …);
+                // SRAMs use the PORT_*_CLK pair.
+                let is_clkn = pin_name == "CLKN";
+                if !matches!(pin_name, "CLK" | "CLKN" | "PORT_R_CLK" | "PORT_W_CLK") {
                     continue;
                 }
                 trace_count += 1;
                 if seq_count <= 5 {
                     clilog::info!("    Tracing clock pin {} for cell {}...", pinid, cellid);
                 }
-                if let Err(pinid) = aig.trace_clock_pin(netlistdb, pinid, false, true) {
+                // Negative-edge cells (CLKN) trigger on the falling edge:
+                // start the trace with is_negedge=true so trace_clock_pin
+                // records the inverted clock signal.
+                if let Err(pinid) = aig.trace_clock_pin(netlistdb, pinid, is_clkn, true) {
                     use netlistdb::GeneralHierName;
                     panic!(
                         "Tracing clock pin of cell {} error: \
@@ -1721,6 +1797,130 @@ impl AIG {
                 dff.en_iv = ap_clken_iv;
                 dff.d_iv = d_in;
                 assert_ne!(dff.q, 0, "SKY130 DFF {} has no Q output built", cellid);
+            } else if is_gf180mcu_cell(celltype)
+                && crate::gf180mcu_pdk::is_sequential_cell(crate::gf180mcu::extract_cell_type(
+                    celltype,
+                ))
+            {
+                // GF180MCU sequentials: DFFs / scan DFFs / latches /
+                // clock-gating cells. Same async-set/reset shape as
+                // sky130, but pin names are GF180-specific (RN/SETN
+                // active-low; CLKN for negative-edge cells; SE/SI for
+                // scan DFFs; TE/E for clock-gating cells).
+                //
+                // Async S/R semantics:
+                //   RN  active-low reset (RN=0 forces Q=0)
+                //   SETN active-low set (SETN=0 forces Q=1)
+                // ⇒ same AIG formula as sky130's RESET_B/SET_B:
+                //   d_in  = AND(OR(D, NOT SETN), RN)
+                //   en_iv = OR(posedge_clk, NOT RN, NOT SETN)
+                //
+                // Scan DFFs implement D_eff = SE ? SI : D upstream of
+                // the latch via combinational logic in the functional
+                // model; we replicate that here so the synthesised
+                // logic matches.
+                //
+                // icgtp/icgtn are clock-gating cells whose Q output
+                // is a gated clock rather than a true register output.
+                // We treat them as state-holding DFFs to avoid a
+                // panic; clock-tree-aware simulation through them is
+                // a follow-on item (Phase 5+).
+                let cell_type = crate::gf180mcu::extract_cell_type(celltype);
+                let mut ap_d_iv: usize = 0;
+                let mut ap_clken_iv: usize = 0;
+                let mut ap_s_iv: usize = 1; // SETN default = inactive
+                let mut ap_r_iv: usize = 1; // RN default = inactive
+                let mut ap_se_iv: Option<usize> = None;
+                let mut ap_si_iv: Option<usize> = None;
+                let mut ap_e_iv: Option<usize> = None;
+                let mut ap_te_iv: Option<usize> = None;
+                let mut have_clk: bool = false;
+
+                for pinid in netlistdb.cell2pin.iter_set(cellid) {
+                    let pin_iv = aig.pin2aigpin_iv[pinid];
+                    match netlistdb.pinnames[pinid].1.as_str() {
+                        "D" => ap_d_iv = pin_iv,
+                        "SETN" => ap_s_iv = pin_iv,
+                        "RN" => ap_r_iv = pin_iv,
+                        "SE" => ap_se_iv = Some(pin_iv),
+                        "SI" => ap_si_iv = Some(pin_iv),
+                        // Latch enable (also reused as data-port for
+                        // clock-gating cells where it appears alongside TE).
+                        "E" => ap_e_iv = Some(pin_iv),
+                        "TE" => ap_te_iv = Some(pin_iv),
+                        // CLK (positive edge) and CLKN (negative edge)
+                        // both produce ap_clken_iv via trace_clock_pin;
+                        // CLKN flips the start polarity so the inferred
+                        // signal is the falling-edge tracker.
+                        "CLK" => {
+                            ap_clken_iv =
+                                aig.trace_clock_pin(netlistdb, pinid, false, false).unwrap();
+                            have_clk = true;
+                        }
+                        "CLKN" => {
+                            ap_clken_iv =
+                                aig.trace_clock_pin(netlistdb, pinid, true, false).unwrap();
+                            have_clk = true;
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Scan-flop D mux: D_eff = SE ? SI : D. AIG: D_eff =
+                // OR(AND(D, NOT SE), AND(SI, SE)). When SE/SI are
+                // absent (non-scan DFFs), this branch is skipped.
+                if let (Some(se), Some(si)) = (ap_se_iv, ap_si_iv) {
+                    let d_when_normal = aig.add_and_gate(ap_d_iv, se ^ 1);
+                    let d_when_scan = aig.add_and_gate(si, se);
+                    // OR via De Morgan: a + b = NOT(NOT(a) AND NOT(b))
+                    let nor_ab = aig.add_and_gate(d_when_normal ^ 1, d_when_scan ^ 1);
+                    ap_d_iv = nor_ab ^ 1;
+                }
+
+                // Clock-gating cells (icgtp/icgtn): no D pin in the
+                // module ports. The latched value is `E | TE`. Wire
+                // that up as the D input so the underlying DFF/latch
+                // emulation captures something meaningful, even
+                // though Q is also subject to a CLK gate which we
+                // can't represent purely in the en_iv/d_iv form.
+                if matches!(cell_type, "icgtp" | "icgtn") {
+                    if let (Some(e), Some(te)) = (ap_e_iv, ap_te_iv) {
+                        let nor_et = aig.add_and_gate(e ^ 1, te ^ 1);
+                        ap_d_iv = nor_et ^ 1;
+                    }
+                }
+
+                // Latches (latq/latrnq/latsnq/latrsnq): D-input is the
+                // module `D` pin, en_iv is the module `E` pin (level-
+                // sensitive enable). No clock trace; the user's design
+                // is responsible for keeping E free of combinational
+                // glitches if it cares about latch correctness.
+                if matches!(cell_type, "latq" | "latrnq" | "latsnq" | "latrsnq") {
+                    ap_clken_iv = ap_e_iv.unwrap_or(0);
+                    have_clk = true;
+                }
+
+                assert!(
+                    have_clk,
+                    "GF180MCU sequential cell '{cell_type}' (id={cellid}) has no \
+                     CLK / CLKN / E pin — pin-table or classification bug?",
+                );
+
+                let mut d_in = ap_d_iv;
+
+                // Apply async set/reset to D input and clock enable
+                // (identical formulas to sky130's SET_B/RESET_B):
+                //   d_in  = AND(OR(D, NOT SETN), RN)
+                //   clken = OR(posedge_clk, NOT RN, NOT SETN)
+                d_in = aig.add_and_gate(d_in ^ 1, ap_s_iv) ^ 1;
+                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_s_iv) ^ 1;
+                d_in = aig.add_and_gate(d_in, ap_r_iv);
+                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_r_iv) ^ 1;
+
+                let dff = aig.dffs.entry(cellid).or_default();
+                dff.en_iv = ap_clken_iv;
+                dff.d_iv = d_in;
+                assert_ne!(dff.q, 0, "GF180MCU DFF {cellid} has no Q output built");
             } else if celltype == "$__RAMGEM_SYNC_" {
                 let mut sram = aig.srams.entry(cellid).or_default().clone();
                 let mut write_clken_iv = 0;
