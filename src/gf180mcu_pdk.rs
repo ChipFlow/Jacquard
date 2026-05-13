@@ -743,4 +743,529 @@ mod tests {
     fn equivalent_addf_carry_out() {
         assert_equivalent("addf", "CO");
     }
+
+    // -------------------------------------------------------------------------
+    // Sequential cells (Phase 4b): build a Verilog netlist with one DFF,
+    // run AIG construction end-to-end, then simulate one clock cycle using
+    // a small in-test AIG evaluator and assert Q updates per the cell's
+    // reset / set / scan semantics.
+    // -------------------------------------------------------------------------
+
+    use crate::aig::{DriverType, AIG};
+    use crate::gf180mcu::GF180MCULeafPins;
+
+    /// Evaluate every AIG pin in topological order, returning a Vec
+    /// where index = aigpin and value = boolean. `inputs` maps each
+    /// `DriverType::InputPort(netlist_pin)` to its current cycle value;
+    /// `clock_flags` maps each `DriverType::InputClockFlag(netlist_pin, edge)`
+    /// to its current value (typically 1 if the edge has just fired, else 0);
+    /// `dff_state` maps each `DriverType::DFF(cellid)` to its current
+    /// stored Q state.
+    fn eval_aig_combinational(
+        aig: &AIG,
+        inputs: &HashMap<usize, bool>,
+        clock_flags: &HashMap<(usize, u8), bool>,
+        dff_state: &HashMap<usize, bool>,
+    ) -> Vec<bool> {
+        let mut vals = vec![false; aig.num_aigpins + 1];
+        // Pin 0 is Tie0 = false.
+        for i in 1..=aig.num_aigpins {
+            vals[i] = match &aig.drivers[i] {
+                DriverType::Tie0 => false,
+                DriverType::InputPort(p) => *inputs.get(p).unwrap_or(&false),
+                DriverType::InputClockFlag(p, edge) => {
+                    *clock_flags.get(&(*p, *edge)).unwrap_or(&false)
+                }
+                DriverType::DFF(cellid) => *dff_state.get(cellid).unwrap_or(&false),
+                DriverType::SRAM(_) => false,
+                DriverType::AndGate(a_iv, b_iv) => {
+                    let a = vals[a_iv >> 1] ^ ((a_iv & 1) == 1);
+                    let b = vals[b_iv >> 1] ^ ((b_iv & 1) == 1);
+                    a && b
+                }
+            };
+        }
+        vals
+    }
+
+    /// Read an aigpin_iv value into a bool, using a vector of evaluated
+    /// pin values. `iv == usize::MAX` ⇒ unwired (use default `false`).
+    fn read_iv(iv: usize, vals: &[bool]) -> bool {
+        if iv == usize::MAX {
+            return false;
+        }
+        let pin = iv >> 1;
+        let inv = (iv & 1) == 1;
+        vals[pin] ^ inv
+    }
+
+    /// Build a netlist around one GF180MCU sequential cell instance plus
+    /// the IO buffers needed to surface each pin as a primary input or
+    /// output. Returns the AIG and a map from each module port name to
+    /// its netlistdb pin id (so tests can look up `D`, `CLK`, `RN`, etc.).
+    fn build_one_cell_aig(
+        cell_type: &str,
+        cell_pins: &[(&str, &str)],
+    ) -> (AIG, netlistdb::NetlistDB, HashMap<String, usize>) {
+        // Compose Verilog: a `tiny` module exposing every cell input as
+        // its own primary input and Q as the only primary output.
+        let mut verilog = String::from("module tiny(");
+        let port_list: Vec<&str> = cell_pins.iter().map(|(_, port)| *port).collect();
+        verilog.push_str(&port_list.join(", "));
+        verilog.push_str(");\n");
+
+        for (pin_name, port) in cell_pins {
+            let dir = if *pin_name == "Q" { "output" } else { "input" };
+            verilog.push_str(&format!("  {dir} {port};\n"));
+        }
+        verilog.push_str(&format!(
+            "  gf180mcu_fd_sc_mcu7t5v0__{cell_type}_1 u (\n"
+        ));
+        let conn_list: Vec<String> = cell_pins
+            .iter()
+            .map(|(pin_name, port)| format!("    .{pin_name}({port})"))
+            .collect();
+        verilog.push_str(&conn_list.join(",\n"));
+        verilog.push_str("\n  );\n");
+        // GF180MCU functional models include a `notifier` input; tie it
+        // to 0 explicitly if not already connected.
+        verilog.push_str("endmodule\n");
+
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            &verilog,
+            Some("tiny"),
+            &GF180MCULeafPins,
+        )
+        .unwrap_or_else(|| panic!("netlist parse failed for cell '{cell_type}'"));
+
+        // Map each module port name → netlistdb pin id (top-level cell 0).
+        let mut port_to_pin: HashMap<String, usize> = HashMap::new();
+        for pinid in nl.cell2pin.iter_set(0) {
+            let pin_name = nl.pinnames[pinid].1.as_str().to_string();
+            port_to_pin.insert(pin_name, pinid);
+        }
+
+        let aig = AIG::from_netlistdb(&nl);
+        (aig, nl, port_to_pin)
+    }
+
+    /// Find the cell-id of the single instance whose celltype starts
+    /// with `gf180mcu_fd_sc_mcu7t5v0__<cell_type>`.
+    fn find_cell_id(nl: &netlistdb::NetlistDB, cell_type: &str) -> usize {
+        let needle = format!("gf180mcu_fd_sc_mcu7t5v0__{cell_type}_");
+        for cid in 1..nl.num_cells {
+            if nl.celltypes[cid].as_str().starts_with(&needle) {
+                return cid;
+            }
+        }
+        panic!("no instance of cell type '{cell_type}' found in netlist");
+    }
+
+    /// One-cycle DFF simulation: given AIG with one DFF, current state,
+    /// and input port values, return the new state after the clock edge
+    /// (latching `dff.d_iv` if `dff.en_iv` evaluates to 1, holding
+    /// otherwise). The reset / set logic is layered into `pin2aigpin_iv`
+    /// of the Q pin (which we don't read here — see the caller).
+    fn step_dff(
+        aig: &AIG,
+        dff_cellid: usize,
+        inputs: &HashMap<usize, bool>,
+        current_state: bool,
+    ) -> bool {
+        let dff = aig.dffs.get(&dff_cellid).expect("DFF missing");
+        // Build clock-flag map: every clock pin's posedge/negedge flag
+        // is "1" so the cycle counts as having fired.
+        let mut clock_flags = HashMap::new();
+        for (clk_pin, &(pos_id, neg_id)) in aig.clock_pin2aigpins.iter() {
+            if pos_id != usize::MAX {
+                clock_flags.insert((*clk_pin, 0u8), true);
+            }
+            if neg_id != usize::MAX {
+                clock_flags.insert((*clk_pin, 1u8), true);
+            }
+        }
+        let dff_state = HashMap::from([(dff_cellid, current_state)]);
+        let vals = eval_aig_combinational(aig, inputs, &clock_flags, &dff_state);
+        let d_in = read_iv(dff.d_iv, &vals);
+        let en = read_iv(dff.en_iv, &vals);
+        if en {
+            d_in
+        } else {
+            current_state
+        }
+    }
+
+    /// Evaluate the Q **output port** (which carries the reset / set
+    /// overlay) given a current DFF state and input port values.
+    fn read_q_output(
+        aig: &AIG,
+        nl: &netlistdb::NetlistDB,
+        q_pinid: usize,
+        inputs: &HashMap<usize, bool>,
+        dff_state: &HashMap<usize, bool>,
+    ) -> bool {
+        let mut clock_flags = HashMap::new();
+        for (clk_pin, &(pos_id, neg_id)) in aig.clock_pin2aigpins.iter() {
+            if pos_id != usize::MAX {
+                clock_flags.insert((*clk_pin, 0u8), true);
+            }
+            if neg_id != usize::MAX {
+                clock_flags.insert((*clk_pin, 1u8), true);
+            }
+        }
+        let vals = eval_aig_combinational(aig, inputs, &clock_flags, dff_state);
+        // q_pinid is a primary-output pin (input direction on cell 0); its
+        // value is the driver-pin's aigpin_iv. The Q **output port** of
+        // the DFF cell carries the post-overlay value.
+        // We resolve via pin2aigpin_iv on the **cell's Q output**, not
+        // the module's Q port.
+        let _ = nl;
+        let q_iv = aig.pin2aigpin_iv[q_pinid];
+        read_iv(q_iv, &vals)
+    }
+
+    /// Smoke test on `dffq` (plainest positive-edge DFF, no R/S/scan):
+    /// Q faithfully latches D after one clock cycle; no reset overlay
+    /// touches Q.
+    #[test]
+    fn dffq_latches_d_on_clock_edge() {
+        let pins = &[
+            ("CLK", "clk"),
+            ("D", "d"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("dffq", pins);
+        let dff_cellid = find_cell_id(&nl, "dffq");
+        let cell_q_pinid = nl
+            .cell2pin
+            .iter_set(dff_cellid)
+            .find(|&p| nl.pinnames[p].1.as_str() == "Q")
+            .expect("dffq cell Q pin");
+
+        // d=0 → step → Q=0; d=1 → step → Q=1.
+        let mut state = false;
+        for &d_val in &[false, true, false, true, true, false] {
+            let inputs = HashMap::from([(port["d"], d_val), (port["clk"], true)]);
+            state = step_dff(&aig, dff_cellid, &inputs, state);
+            let q_observed = read_q_output(
+                &aig,
+                &nl,
+                cell_q_pinid,
+                &inputs,
+                &HashMap::from([(dff_cellid, state)]),
+            );
+            assert_eq!(q_observed, d_val, "dffq Q mismatch after latching d={d_val}");
+        }
+    }
+
+    /// `dffrnq` async-reset semantics: RN=0 forces Q=0 immediately,
+    /// regardless of D and the DFF's stored state.
+    #[test]
+    fn dffrnq_reset_is_active_low() {
+        let pins = &[
+            ("CLK", "clk"),
+            ("D", "d"),
+            ("RN", "rn"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("dffrnq", pins);
+        let dff_cellid = find_cell_id(&nl, "dffrnq");
+        let cell_q_pinid = nl
+            .cell2pin
+            .iter_set(dff_cellid)
+            .find(|&p| nl.pinnames[p].1.as_str() == "Q")
+            .expect("dffrnq cell Q pin");
+
+        // Step 1: RN=1 (inactive), d=1, latch → Q=1.
+        let inputs1 = HashMap::from([
+            (port["d"], true),
+            (port["clk"], true),
+            (port["rn"], true),
+        ]);
+        let state1 = step_dff(&aig, dff_cellid, &inputs1, false);
+        assert!(state1, "dffrnq should latch d=1 with RN inactive");
+        let q1 = read_q_output(
+            &aig,
+            &nl,
+            cell_q_pinid,
+            &inputs1,
+            &HashMap::from([(dff_cellid, state1)]),
+        );
+        assert!(q1, "dffrnq Q should be 1 after latching with RN=1");
+
+        // Step 2: RN=0 (asserted) should drag Q to 0 *combinationally*
+        // even if the stored state is 1.
+        let inputs2 = HashMap::from([
+            (port["d"], true),
+            (port["clk"], false),
+            (port["rn"], false),
+        ]);
+        let q2 = read_q_output(
+            &aig,
+            &nl,
+            cell_q_pinid,
+            &inputs2,
+            &HashMap::from([(dff_cellid, true)]),
+        );
+        assert!(!q2, "dffrnq Q must be 0 when RN=0 (active-low reset)");
+
+        // Step 3: RN=1, d=0, clock → Q=0 (normal clocking after reset).
+        let inputs3 = HashMap::from([
+            (port["d"], false),
+            (port["clk"], true),
+            (port["rn"], true),
+        ]);
+        let state3 = step_dff(&aig, dff_cellid, &inputs3, false);
+        assert!(!state3, "dffrnq normal clocking after reset");
+    }
+
+    /// `dffsnq` async-set semantics: SETN=0 forces Q=1 immediately.
+    #[test]
+    fn dffsnq_set_is_active_low() {
+        let pins = &[
+            ("CLK", "clk"),
+            ("D", "d"),
+            ("SETN", "setn"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("dffsnq", pins);
+        let dff_cellid = find_cell_id(&nl, "dffsnq");
+        let cell_q_pinid = nl
+            .cell2pin
+            .iter_set(dff_cellid)
+            .find(|&p| nl.pinnames[p].1.as_str() == "Q")
+            .expect("dffsnq cell Q pin");
+
+        // Latch d=0 with SETN inactive.
+        let in0 = HashMap::from([
+            (port["d"], false),
+            (port["clk"], true),
+            (port["setn"], true),
+        ]);
+        let s0 = step_dff(&aig, dff_cellid, &in0, true);
+        let q0 = read_q_output(
+            &aig,
+            &nl,
+            cell_q_pinid,
+            &in0,
+            &HashMap::from([(dff_cellid, s0)]),
+        );
+        assert!(!q0, "dffsnq normal clocking should make Q=0");
+
+        // Assert SETN=0 with stored state false: Q forced to 1.
+        let in1 = HashMap::from([
+            (port["d"], false),
+            (port["clk"], false),
+            (port["setn"], false),
+        ]);
+        let q1 = read_q_output(
+            &aig,
+            &nl,
+            cell_q_pinid,
+            &in1,
+            &HashMap::from([(dff_cellid, false)]),
+        );
+        assert!(q1, "dffsnq Q must be 1 when SETN=0 (active-low set)");
+    }
+
+    /// `dffrsnq` with both reset and set: priority is well-defined.
+    /// RN=0 wins (matches sky130 / AIGPDK convention: AND-of-reset is
+    /// the outermost layer, so a 0 RN drives Q=0 even with SETN=0).
+    #[test]
+    fn dffrsnq_reset_dominates_set() {
+        let pins = &[
+            ("CLK", "clk"),
+            ("D", "d"),
+            ("RN", "rn"),
+            ("SETN", "setn"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("dffrsnq", pins);
+        let dff_cellid = find_cell_id(&nl, "dffrsnq");
+        let cell_q_pinid = nl
+            .cell2pin
+            .iter_set(dff_cellid)
+            .find(|&p| nl.pinnames[p].1.as_str() == "Q")
+            .expect("dffrsnq cell Q pin");
+
+        // Both asserted (RN=0, SETN=0): reset dominates → Q=0.
+        let inputs = HashMap::from([
+            (port["d"], false),
+            (port["clk"], false),
+            (port["rn"], false),
+            (port["setn"], false),
+        ]);
+        let q = read_q_output(
+            &aig,
+            &nl,
+            cell_q_pinid,
+            &inputs,
+            &HashMap::from([(dff_cellid, true)]),
+        );
+        assert!(
+            !q,
+            "dffrsnq: RN=0 (reset) must dominate SETN=0 (set), got Q={q}"
+        );
+    }
+
+    /// `dffnq` uses a negative-edge clock (`CLKN`). Verify it builds
+    /// without panicking and that the clock signal is registered as
+    /// `is_negedge=true` in clock_pin2aigpins.
+    #[test]
+    fn dffnq_clkn_negedge_is_inferred() {
+        let pins = &[
+            ("CLKN", "clkn"),
+            ("D", "d"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("dffnq", pins);
+
+        // The CLKN top-level port should appear in clock_pin2aigpins;
+        // its is_negedge flag (.1) should be set, .0 (posedge) unset.
+        let clkn_pinid = port["clkn"];
+        let (pos, neg) = aig
+            .clock_pin2aigpins
+            .get(&clkn_pinid)
+            .copied()
+            .expect("CLKN must appear in clock_pin2aigpins");
+        assert_eq!(
+            pos,
+            usize::MAX,
+            "dffnq's CLKN must trigger negedge tracking only, got posedge {pos}"
+        );
+        assert_ne!(
+            neg,
+            usize::MAX,
+            "dffnq's CLKN must register a negedge clock signal"
+        );
+        let _ = nl;
+    }
+
+    /// `sdffq` scan flop: D_eff = SE ? SI : D. Verify both branches.
+    #[test]
+    fn sdffq_scan_mux_selects_si_when_se_high() {
+        let pins = &[
+            ("CLK", "clk"),
+            ("D", "d"),
+            ("SE", "se"),
+            ("SI", "si"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("sdffq", pins);
+        let dff_cellid = find_cell_id(&nl, "sdffq");
+
+        // SE=0 → latches D. d=1, si=0 → Q=1.
+        let in_normal = HashMap::from([
+            (port["d"], true),
+            (port["si"], false),
+            (port["se"], false),
+            (port["clk"], true),
+        ]);
+        let state_normal = step_dff(&aig, dff_cellid, &in_normal, false);
+        assert!(
+            state_normal,
+            "sdffq SE=0 must latch D=1, got state={state_normal}"
+        );
+
+        // SE=1 → latches SI. d=0, si=1 → Q=1.
+        let in_scan = HashMap::from([
+            (port["d"], false),
+            (port["si"], true),
+            (port["se"], true),
+            (port["clk"], true),
+        ]);
+        let state_scan = step_dff(&aig, dff_cellid, &in_scan, false);
+        assert!(
+            state_scan,
+            "sdffq SE=1 must latch SI=1, got state={state_scan}"
+        );
+
+        // SE=1, d=1, si=0 → Q=0 (D is ignored).
+        let in_scan_zero = HashMap::from([
+            (port["d"], true),
+            (port["si"], false),
+            (port["se"], true),
+            (port["clk"], true),
+        ]);
+        let state_scan_zero = step_dff(&aig, dff_cellid, &in_scan_zero, true);
+        assert!(
+            !state_scan_zero,
+            "sdffq SE=1 SI=0 must latch 0 (D ignored), got state={state_scan_zero}"
+        );
+    }
+
+    /// `latq` level-sensitive latch: when E=1, Q tracks D; when E=0,
+    /// Q holds its previous value.
+    #[test]
+    fn latq_is_transparent_when_e_high() {
+        let pins = &[
+            ("E", "e"),
+            ("D", "d"),
+            ("Q", "q"),
+            ("notifier", "notif"),
+        ];
+        let (aig, nl, port) = build_one_cell_aig("latq", pins);
+        let dff_cellid = find_cell_id(&nl, "latq");
+
+        // E=1, D=1 → next state = D = 1.
+        let inputs = HashMap::from([(port["d"], true), (port["e"], true)]);
+        let next = step_dff(&aig, dff_cellid, &inputs, false);
+        assert!(next, "latq E=1 must pass D=1 through");
+
+        // E=0 → holds previous state regardless of D.
+        let inputs_hold =
+            HashMap::from([(port["d"], false), (port["e"], false)]);
+        let held = step_dff(&aig, dff_cellid, &inputs_hold, true);
+        assert!(held, "latq E=0 must hold previous state");
+        let _ = nl;
+    }
+
+    /// Every sequential cell type must build without panicking. This
+    /// is the "did Phase 4b actually delete the panic" check, and
+    /// also catches pin-name regressions.
+    #[test]
+    fn all_sequential_cells_build_without_panic() {
+        // Pin layouts cribbed from `OUT_DIR/gf180mcu_pins.rs`.
+        let cell_pin_specs: &[(&str, &[&str])] = &[
+            ("dffq", &["CLK", "D", "notifier", "Q"]),
+            ("dffnq", &["CLKN", "D", "notifier", "Q"]),
+            ("dffrnq", &["CLK", "D", "RN", "notifier", "Q"]),
+            ("dffnrnq", &["CLKN", "D", "RN", "notifier", "Q"]),
+            ("dffsnq", &["CLK", "D", "SETN", "notifier", "Q"]),
+            ("dffnsnq", &["CLKN", "D", "SETN", "notifier", "Q"]),
+            ("dffrsnq", &["CLK", "D", "RN", "SETN", "notifier", "Q"]),
+            ("dffnrsnq", &["CLKN", "D", "RN", "SETN", "notifier", "Q"]),
+            ("sdffq", &["CLK", "D", "SE", "SI", "notifier", "Q"]),
+            ("sdffrnq", &["CLK", "D", "RN", "SE", "SI", "notifier", "Q"]),
+            ("sdffsnq", &["CLK", "D", "SE", "SETN", "SI", "notifier", "Q"]),
+            (
+                "sdffrsnq",
+                &["CLK", "D", "RN", "SE", "SETN", "SI", "notifier", "Q"],
+            ),
+            ("latq", &["D", "E", "notifier", "Q"]),
+            ("latrnq", &["D", "E", "RN", "notifier", "Q"]),
+            ("latsnq", &["D", "E", "SETN", "notifier", "Q"]),
+            ("latrsnq", &["D", "E", "RN", "SETN", "notifier", "Q"]),
+            ("icgtp", &["CLK", "E", "TE", "notifier", "Q"]),
+            ("icgtn", &["CLKN", "E", "TE", "notifier", "Q"]),
+        ];
+
+        for (cell, port_order) in cell_pin_specs {
+            let pins: Vec<(&str, &str)> =
+                port_order.iter().map(|p| (*p, *p)).collect();
+            // build_one_cell_aig panics on parse / AIG construction
+            // failure; reaching the end is the assertion.
+            let (aig, _nl, _port) = build_one_cell_aig(cell, &pins);
+            assert!(
+                aig.num_aigpins > 0,
+                "{cell}: AIG construction produced 0 pins"
+            );
+        }
+    }
 }
