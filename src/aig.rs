@@ -11,6 +11,8 @@
 )]
 
 use crate::aigpdk::AIGPDK_SRAM_ADDR_WIDTH;
+use crate::gf180mcu::is_gf180mcu_cell;
+use crate::gf180mcu_pdk::Gf180PdkModels;
 use crate::sky130::{extract_cell_type, is_sky130_cell};
 use crate::sky130_pdk::{
     decompose_with_pdk, is_multi_output_cell, is_sequential_cell, is_tie_cell, CellInputs,
@@ -578,6 +580,7 @@ impl AIG {
         topo_instack: &mut Vec<bool>,
         start_pinid: usize,
         pdk_models: Option<&PdkModels>,
+        gf180_pdk: Option<&Gf180PdkModels>,
     ) {
         let mut work_stack: Vec<WorkItem> = vec![WorkItem::Visit(start_pinid)];
 
@@ -750,6 +753,19 @@ impl AIG {
                         continue;
                     }
 
+                    // Handle GF180MCU cells (combinational + tie cells only;
+                    // sequentials panic in postprocess until Phase 4b).
+                    if is_gf180mcu_cell(celltype) {
+                        let deps =
+                            self.get_gf180mcu_dependencies(netlistdb, pinid, cellid, celltype);
+                        self.gf180mcu_preprocess(netlistdb, pinid, cellid, celltype);
+                        work_stack.push(WorkItem::Process(pinid));
+                        for dep in deps {
+                            work_stack.push(WorkItem::Visit(dep));
+                        }
+                        continue;
+                    }
+
                     // Handle AIGPDK combinational cells (AND2, INV, BUF)
                     let mut prev_a = usize::MAX;
                     let mut prev_b = usize::MAX;
@@ -829,6 +845,19 @@ impl AIG {
                     // Process SKY130 cells
                     if is_sky130_cell(celltype) {
                         self.sky130_postprocess(netlistdb, pinid, cellid, celltype, pdk_models);
+                        topo_instack[pinid] = false;
+                        continue;
+                    }
+
+                    // Process GF180MCU cells
+                    if is_gf180mcu_cell(celltype) {
+                        self.gf180mcu_postprocess(
+                            netlistdb,
+                            pinid,
+                            cellid,
+                            celltype,
+                            gf180_pdk,
+                        );
                         topo_instack[pinid] = false;
                         continue;
                     }
@@ -1262,6 +1291,154 @@ impl AIG {
         }
     }
 
+    /// GF180MCU dependency-collection hook (Phase 4 combinational only).
+    ///
+    /// Tie cells have no dependencies. Filler/antenna/endcap cells have
+    /// no outputs in the logic graph. Sequential and clock-gating cells
+    /// panic in `gf180mcu_postprocess` until Phase 4b adds UDP handling;
+    /// here we still report their input pins as dependencies so the
+    /// topo-sort is consistent.
+    fn get_gf180mcu_dependencies(
+        &self,
+        netlistdb: &NetlistDB,
+        _pinid: usize,
+        cellid: usize,
+        celltype: &str,
+    ) -> SmallVec<[usize; 6]> {
+        let cell_type = crate::gf180mcu::extract_cell_type(celltype);
+        if crate::gf180mcu_pdk::is_tie_cell(cell_type)
+            || crate::gf180mcu_pdk::is_filler_cell(cell_type)
+        {
+            return SmallVec::new();
+        }
+        let mut deps = SmallVec::new();
+        for dep_pinid in netlistdb.cell2pin.iter_set(cellid) {
+            if netlistdb.pindirect[dep_pinid] == Direction::I {
+                deps.push(dep_pinid);
+            }
+        }
+        deps
+    }
+
+    /// GF180MCU pre-process. Tie cells set their output immediately;
+    /// everything else waits for postprocess.
+    fn gf180mcu_preprocess(
+        &mut self,
+        netlistdb: &NetlistDB,
+        pinid: usize,
+        _cellid: usize,
+        celltype: &str,
+    ) {
+        let cell_type = crate::gf180mcu::extract_cell_type(celltype);
+        if crate::gf180mcu_pdk::is_tie_cell(cell_type) {
+            // tieh → constant-1 (aigpin_iv 1), tiel → constant-0 (aigpin_iv 0).
+            // Both cells declare their single output as Z.
+            let output_pin_name = netlistdb.pinnames[pinid].1.as_str();
+            assert_eq!(
+                output_pin_name, "Z",
+                "Expected Z output for gf180mcu tie cell, got '{output_pin_name}'",
+            );
+            self.pin2aigpin_iv[pinid] = if cell_type == "tieh" { 1 } else { 0 };
+        }
+    }
+
+    /// GF180MCU post-process. Decomposes combinational cells via
+    /// `decompose_combinational` and stitches the resulting DecompResult
+    /// into the global AIG. Sequential / clock-gating cells panic until
+    /// Phase 4b adds UDP handling.
+    fn gf180mcu_postprocess(
+        &mut self,
+        netlistdb: &NetlistDB,
+        pinid: usize,
+        cellid: usize,
+        celltype: &str,
+        gf180_pdk: Option<&Gf180PdkModels>,
+    ) {
+        let cell_type = crate::gf180mcu::extract_cell_type(celltype);
+
+        // Tie + filler were either handled in preprocess or contribute no
+        // logic.
+        if crate::gf180mcu_pdk::is_tie_cell(cell_type)
+            || crate::gf180mcu_pdk::is_filler_cell(cell_type)
+        {
+            return;
+        }
+
+        if crate::gf180mcu_pdk::is_sequential_cell(cell_type) {
+            panic!(
+                "GF180MCU sequential / clock-gating cell '{cell_type}' decomposition \
+                 is not yet implemented (Phase 4b). \
+                 See docs/plans/gf180mcu-enablement.md."
+            );
+        }
+
+        let pdk = gf180_pdk.expect(
+            "GF180 PDK models required for gf180mcu cell decomposition. \
+             Ensure vendor/gf180mcu_fd_sc_mcu7t5v0 submodule is initialized.",
+        );
+        let model = pdk.models.get(cell_type).unwrap_or_else(|| {
+            panic!(
+                "No GF180MCU behavioural model loaded for cell type '{cell_type}'. \
+                 from_netlistdb only loads models for cells present in the netlist; \
+                 this points at a load_pdk_models bug.",
+            )
+        });
+
+        // Build inputs map by pin name. The HashMap allocation per cell
+        // is fine — combinational cells are small and the decomposer
+        // path runs once per cell instance during AIG construction.
+        let mut inputs: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for ipin in netlistdb.cell2pin.iter_set(cellid) {
+            if netlistdb.pindirect[ipin] != Direction::O {
+                let pin_name = netlistdb.pinnames[ipin].1.as_str();
+                // Skip output pins by name (defensive — handles cells
+                // with mis-detected pin directions).
+                if matches!(pin_name, "Z" | "ZN" | "Q" | "S" | "CO") {
+                    continue;
+                }
+                inputs.insert(pin_name.to_string(), self.pin2aigpin_iv[ipin]);
+            }
+        }
+
+        let output_pin_name = netlistdb.pinnames[pinid].1.as_str();
+        let decomp = crate::gf180mcu_pdk::decompose_combinational(model, &inputs, output_pin_name);
+
+        // Stitch the DecompResult into the global AIG — same algorithm
+        // as sky130_postprocess's tail.
+        let mut gate_outputs: SmallVec<[usize; 5]> = SmallVec::new();
+        for &(a_ref, b_ref) in &decomp.and_gates {
+            let a_iv = self.resolve_decomp_ref(a_ref, &gate_outputs);
+            let b_iv = self.resolve_decomp_ref(b_ref, &gate_outputs);
+            let gate_out = self.add_and_gate(a_iv, b_iv);
+            gate_outputs.push(gate_out >> 1);
+        }
+
+        let output_iv = if decomp.output_idx < 0 {
+            let gate_idx = (-decomp.output_idx - 1) as usize;
+            gate_outputs[gate_idx] << 1
+        } else {
+            (decomp.output_idx as usize) << 1
+        };
+        let final_iv = if decomp.output_inverted {
+            output_iv ^ 1
+        } else {
+            output_iv
+        };
+        self.pin2aigpin_iv[pinid] = final_iv;
+
+        // Record cell origin for SDF / timing back-annotation, mirroring
+        // the SKY130 path.
+        let output_aigpin = final_iv >> 1;
+        if output_aigpin > 0 && output_aigpin < self.aigpin_cell_origins.len() {
+            self.aigpin_cell_origins[output_aigpin].push((
+                cellid,
+                cell_type.to_string(),
+                output_pin_name.to_string(),
+            ));
+        }
+    }
+
     /// Resolve a decomposition reference to an aigpin_iv value.
     fn resolve_decomp_ref(&self, ref_val: i64, gate_outputs: &[usize]) -> usize {
         if ref_val < 0 {
@@ -1290,18 +1467,21 @@ impl AIG {
 
     /// Build an AIG from a netlistdb, using explicit PDK behavioral models for decomposition.
     pub fn from_netlistdb_with_pdk(netlistdb: &NetlistDB, pdk_models: &PdkModels) -> AIG {
-        Self::from_netlistdb_impl(netlistdb, Some(pdk_models))
+        Self::from_netlistdb_impl(netlistdb, Some(pdk_models), None)
     }
 
     /// Build an AIG from a netlistdb.
     ///
-    /// For designs with SKY130 cells, automatically loads PDK models from the
-    /// `vendor/sky130_fd_sc_hd/cells` submodule. Panics with a helpful message if the
-    /// submodule is not initialized.
+    /// For designs with SKY130 or GF180MCU cells, automatically loads PDK
+    /// behavioural models from the matching vendored submodule. Panics
+    /// with a helpful message if the submodule is not initialised.
+    /// Per `CellLibrary::Mixed` rejection upstream, the netlist is
+    /// guaranteed to use at most one PDK.
     pub fn from_netlistdb(netlistdb: &NetlistDB) -> AIG {
-        // Check if the design uses SKY130 cells
         let has_sky130 =
             (1..netlistdb.num_cells).any(|cid| is_sky130_cell(netlistdb.celltypes[cid].as_str()));
+        let has_gf180mcu = (1..netlistdb.num_cells)
+            .any(|cid| is_gf180mcu_cell(netlistdb.celltypes[cid].as_str()));
 
         if has_sky130 {
             let pdk_path = std::path::PathBuf::from("vendor/sky130_fd_sc_hd/cells");
@@ -1310,7 +1490,6 @@ impl AIG {
                 "Design uses SKY130 cells but sky130_fd_sc_hd submodule not found. \
                  Run: git submodule update --init"
             );
-            // Collect cell types
             let mut cell_types: Vec<String> = Vec::new();
             for cellid in 1..netlistdb.num_cells {
                 let celltype = netlistdb.celltypes[cellid].as_str();
@@ -1323,13 +1502,39 @@ impl AIG {
             }
             cell_types.sort();
             let pdk_models = crate::sky130_pdk::load_pdk_models(&pdk_path, &cell_types);
-            Self::from_netlistdb_impl(netlistdb, Some(&pdk_models))
+            Self::from_netlistdb_impl(netlistdb, Some(&pdk_models), None)
+        } else if has_gf180mcu {
+            // Cell models for 7t and 9t are byte-identical (verified in
+            // build.rs); load from the 7t submodule and reuse.
+            let pdk_path = std::path::PathBuf::from("vendor/gf180mcu_fd_sc_mcu7t5v0");
+            assert!(
+                pdk_path.exists(),
+                "Design uses GF180MCU cells but gf180mcu_fd_sc_mcu7t5v0 submodule not found. \
+                 Run: git submodule update --init"
+            );
+            let mut cell_types: Vec<String> = Vec::new();
+            for cellid in 1..netlistdb.num_cells {
+                let celltype = netlistdb.celltypes[cellid].as_str();
+                if is_gf180mcu_cell(celltype) {
+                    let ct = crate::gf180mcu::extract_cell_type(celltype).to_string();
+                    if !cell_types.contains(&ct) {
+                        cell_types.push(ct);
+                    }
+                }
+            }
+            cell_types.sort();
+            let gf180_pdk = crate::gf180mcu_pdk::load_pdk_models(&pdk_path, &cell_types);
+            Self::from_netlistdb_impl(netlistdb, None, Some(&gf180_pdk))
         } else {
-            Self::from_netlistdb_impl(netlistdb, None)
+            Self::from_netlistdb_impl(netlistdb, None, None)
         }
     }
 
-    fn from_netlistdb_impl(netlistdb: &NetlistDB, pdk_models: Option<&PdkModels>) -> AIG {
+    fn from_netlistdb_impl(
+        netlistdb: &NetlistDB,
+        pdk_models: Option<&PdkModels>,
+        gf180_pdk: Option<&Gf180PdkModels>,
+    ) -> AIG {
         let mut aig = AIG {
             num_aigpins: 0,
             pin2aigpin_iv: vec![usize::MAX; netlistdb.num_pins],
@@ -1429,6 +1634,7 @@ impl AIG {
                 &mut topo_instack,
                 pinid,
                 pdk_models,
+                gf180_pdk,
             );
         }
 

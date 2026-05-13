@@ -70,9 +70,10 @@ pub fn load_design(args: &DesignArgs) -> LoadedDesign {
             &SKY130LeafPins,
         )
         .expect("cannot build netlist"),
-        // Phase 2 wires pin directions for GF180MCU netlist parsing.
-        // AIG construction (Phase 4 decomposition) still panics for
-        // gf180mcu cell types — that's the next sim-path blocker.
+        // Phase 4 combinational decomposition is wired through. Sequential
+        // GF180MCU cells (DFFs, latches, clock gates) still panic at AIG
+        // construction until Phase 4b adds UDP handling — combinational
+        // gate-level netlists work end-to-end today.
         CellLibrary::GF180MCU => NetlistDB::from_sverilog_file(
             &args.netlist_verilog,
             args.top_module.as_deref(),

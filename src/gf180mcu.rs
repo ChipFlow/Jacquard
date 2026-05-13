@@ -232,6 +232,35 @@ mod tests {
     }
 
     #[test]
+    fn aig_builds_from_combinational_gf180mcu_netlist() {
+        // End-to-end: gf180mcu Verilog → NetlistDB → AIG. Exercises
+        // the full Phase 4 path: GF180MCULeafPins, library detection,
+        // load_pdk_models, decompose_combinational, AIG integration.
+        const VERILOG: &str = r#"
+module tiny(A, B, C, Y, Z);
+  input A, B, C;
+  output Y, Z;
+  wire mid;
+  gf180mcu_fd_sc_mcu7t5v0__nand2_1 u1 (.A1(A), .A2(B), .ZN(mid));
+  gf180mcu_fd_sc_mcu9t5v0__inv_1   u2 (.I(mid), .ZN(Y));
+  gf180mcu_fd_sc_mcu7t5v0__or3_1   u3 (.A1(A), .A2(B), .A3(C), .Z(Z));
+endmodule
+"#;
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            VERILOG,
+            Some("tiny"),
+            &GF180MCULeafPins,
+        )
+        .expect("netlist parse");
+        let aig = crate::aig::AIG::from_netlistdb(&nl);
+        // NAND2 + INV cancel out (NAND followed by INV = AND), and OR3
+        // decomposes to a chain of AND gates with input/output inversion.
+        // Exact AIG-pin count varies with synthesis choices; just assert
+        // construction succeeded and produced a non-empty AIG.
+        assert!(aig.num_aigpins > 0, "AIG should have at least one pin");
+    }
+
+    #[test]
     fn netlist_db_round_trips_a_mixed_7t_9t_design() {
         // Exercise the full LeafPinProvider contract through NetlistDB —
         // catches missing pin entries, mis-typed directions, and any
