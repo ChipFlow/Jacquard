@@ -345,6 +345,41 @@ impl AIG {
         aigpin << 1
     }
 
+    /// Apply the standard active-low async-set / async-reset overlay
+    /// onto a DFF's `d_in` and clock-enable signals.
+    ///
+    /// Semantics (matches AIGPDK DFFSR, SKY130 RESET_B/SET_B, and
+    /// GF180MCU RN/SETN):
+    ///
+    /// ```text
+    ///   reset_n active-low: reset_n=0 forces Q=0
+    ///   set_n   active-low: set_n=0   forces Q=1
+    ///
+    ///   d_in  = AND(OR(D, NOT set_n), reset_n)
+    ///   clken = OR(clken, NOT reset_n, NOT set_n)
+    /// ```
+    ///
+    /// Pass `1` for `set_n_iv` / `reset_n_iv` to indicate "no async
+    /// set" / "no async reset" — `add_and_gate` constant-folds those
+    /// branches away.
+    fn wire_dff_reset_set_overlay(
+        &mut self,
+        d_in: usize,
+        clken: usize,
+        reset_n_iv: usize,
+        set_n_iv: usize,
+    ) -> (usize, usize) {
+        // d_in  = OR(d_in, NOT set_n)         = NOT(AND(NOT d_in, set_n))
+        // clken = OR(clken, NOT set_n)        = NOT(AND(NOT clken, set_n))
+        let d_in = self.add_and_gate(d_in ^ 1, set_n_iv) ^ 1;
+        let clken = self.add_and_gate(clken ^ 1, set_n_iv) ^ 1;
+        // d_in  = AND(d_in, reset_n)
+        // clken = OR(clken, NOT reset_n)      = NOT(AND(NOT clken, reset_n))
+        let d_in = self.add_and_gate(d_in, reset_n_iv);
+        let clken = self.add_and_gate(clken ^ 1, reset_n_iv) ^ 1;
+        (d_in, clken)
+    }
+
     /// given a clock pin, trace back to clock root and return its
     /// enable signal (with invert bit).
     ///
@@ -1917,17 +1952,12 @@ impl AIG {
                         _ => {}
                     }
                 }
-                let mut d_in = ap_d_iv;
-
                 // AIGPDK DFFSR .lib says: clear="(!R)", preset="(!S)"
                 // i.e. R=0 → Q=0 (clear), S=0 → Q=1 (preset)
-                // Same active-low semantics as SKY130 RESET_B/SET_B:
-                //   d_in = AND(OR(D, !S), R)
-                //   en_iv = OR(posedge, !R, !S)  (latch whenever R or S is active)
-                d_in = aig.add_and_gate(d_in ^ 1, ap_s_iv) ^ 1;
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_s_iv) ^ 1;
-                d_in = aig.add_and_gate(d_in, ap_r_iv);
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_r_iv) ^ 1;
+                // Same active-low semantics as SKY130 RESET_B/SET_B and
+                // GF180 RN/SETN — shared overlay helper.
+                let (d_in, ap_clken_iv) =
+                    aig.wire_dff_reset_set_overlay(ap_d_iv, ap_clken_iv, ap_r_iv, ap_s_iv);
                 let dff = aig.dffs.entry(cellid).or_default();
                 dff.en_iv = ap_clken_iv;
                 dff.d_iv = d_in;
@@ -1964,13 +1994,10 @@ impl AIG {
                     ap_clken_iv = aig.add_and_gate(ap_clken_iv, ap_enable_iv);
                 }
 
-                let mut d_in = ap_d_iv;
-
-                // Apply async set/reset to D input and clock enable (same as AIGPDK DFF)
-                d_in = aig.add_and_gate(d_in ^ 1, ap_s_iv) ^ 1;
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_s_iv) ^ 1;
-                d_in = aig.add_and_gate(d_in, ap_r_iv);
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_r_iv) ^ 1;
+                // Apply async set/reset to D input and clock enable
+                // (shared overlay helper — same as AIGPDK DFFSR and GF180MCU).
+                let (d_in, ap_clken_iv) =
+                    aig.wire_dff_reset_set_overlay(ap_d_iv, ap_clken_iv, ap_r_iv, ap_s_iv);
 
                 let dff = aig.dffs.entry(cellid).or_default();
                 dff.en_iv = ap_clken_iv;
@@ -2084,16 +2111,13 @@ impl AIG {
                      CLK / CLKN / E pin — pin-table or classification bug?",
                 );
 
-                let mut d_in = ap_d_iv;
-
                 // Apply async set/reset to D input and clock enable
-                // (identical formulas to sky130's SET_B/RESET_B):
+                // (shared overlay helper — identical formulas to AIGPDK
+                // DFFSR and sky130 SET_B/RESET_B):
                 //   d_in  = AND(OR(D, NOT SETN), RN)
                 //   clken = OR(posedge_clk, NOT RN, NOT SETN)
-                d_in = aig.add_and_gate(d_in ^ 1, ap_s_iv) ^ 1;
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_s_iv) ^ 1;
-                d_in = aig.add_and_gate(d_in, ap_r_iv);
-                ap_clken_iv = aig.add_and_gate(ap_clken_iv ^ 1, ap_r_iv) ^ 1;
+                let (d_in, ap_clken_iv) =
+                    aig.wire_dff_reset_set_overlay(ap_d_iv, ap_clken_iv, ap_r_iv, ap_s_iv);
 
                 let dff = aig.dffs.entry(cellid).or_default();
                 dff.en_iv = ap_clken_iv;
