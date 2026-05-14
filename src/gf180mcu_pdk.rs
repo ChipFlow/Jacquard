@@ -27,7 +27,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::sky130_pdk::{
+use crate::pdk_decomp::{
     build_chain_gate, build_udp_aig, build_xor_chain, finalize_decomp_result, parse_udp,
     BehavioralGate, BehavioralModel, DecompResult, UdpModel, WireVal,
 };
