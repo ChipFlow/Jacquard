@@ -159,22 +159,8 @@ jobs:
       - name: Install LLVM (for OpenMP support)
         run: |
           # Self-hosted runner's non-interactive shell doesn't inherit
-          # Homebrew on PATH, and a fresh runner may not have Homebrew
-          # installed at all. Detect at the canonical Apple Silicon and
-          # Intel paths; install via the official script if missing.
-          if [ -x /opt/homebrew/bin/brew ]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-          elif [ -x /usr/local/bin/brew ]; then
-            eval "$(/usr/local/bin/brew shellenv)"
-          else
-            NONINTERACTIVE=1 /bin/bash -c \
-              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            if [ -x /opt/homebrew/bin/brew ]; then
-              eval "$(/opt/homebrew/bin/brew shellenv)"
-            else
-              eval "$(/usr/local/bin/brew shellenv)"
-            fi
-          fi
+          # Homebrew on PATH; source shellenv before invoking brew.
+          eval "$(/opt/homebrew/bin/brew shellenv)"
           brew install llvm
           LLVM_PREFIX=$(brew --prefix llvm)
           echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
@@ -586,22 +572,8 @@ jobs:
       - name: Install LLVM (for OpenMP support)
         run: |
           # Self-hosted runner's non-interactive shell doesn't inherit
-          # Homebrew on PATH, and a fresh runner may not have Homebrew
-          # installed at all. Detect at the canonical Apple Silicon and
-          # Intel paths; install via the official script if missing.
-          if [ -x /opt/homebrew/bin/brew ]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-          elif [ -x /usr/local/bin/brew ]; then
-            eval "$(/usr/local/bin/brew shellenv)"
-          else
-            NONINTERACTIVE=1 /bin/bash -c \
-              "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            if [ -x /opt/homebrew/bin/brew ]; then
-              eval "$(/opt/homebrew/bin/brew shellenv)"
-            else
-              eval "$(/usr/local/bin/brew shellenv)"
-            fi
-          fi
+          # Homebrew on PATH; source shellenv before invoking brew.
+          eval "$(/opt/homebrew/bin/brew shellenv)"
           brew install llvm
           LLVM_PREFIX=$(brew --prefix llvm)
           echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
