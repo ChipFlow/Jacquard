@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["decompose_combinational","is_delay_cell","is_filler_cell","is_multi_output_cell","is_sequential_cell","is_tie_cell","load_pdk_models"],"struct":["Gf180PdkModels"]};
+window.SIDEBAR_ITEMS = {"fn":["decompose_combinational","decompose_with_pdk","is_delay_cell","is_filler_cell","is_multi_output_cell","is_sequential_cell","is_tie_cell","load_pdk_models"],"struct":["Gf180PdkModels"]};
