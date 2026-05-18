@@ -176,7 +176,37 @@ impl LeafPinProvider for GF180MCULeafPins {
         pin_name: &CompactString,
         _pin_idx: Option<isize>,
     ) -> Direction {
+        // Power / ground pins follow a fixed naming convention across both
+        // the standard-cell and pad libraries and are always Inout. Short-
+        // circuiting here sidesteps per-cell table drift: the vendored
+        // Verilog cell models declare power pins as `inout` (e.g.
+        // `inout VDD, VSS;` on antenna) but build.rs only parses
+        // `input`/`output` declarations, so the generated GF180MCU_PIN_TABLE
+        // is missing them. The post-PnR netlist connects them explicitly,
+        // which otherwise panics on the first VDD lookup. Local
+        // apitronix-integration patch (2026-05-16) — file upstream once
+        // verified across enough cells.
+        if matches!(
+            pin_name.as_str(),
+            "VDD" | "VSS" | "VNW" | "VPW" | "VPB" | "VNB" | "VPWR" | "VGND"
+                | "DVDD" | "DVSS" | "AVDD" | "AVSS"
+        ) {
+            // Direction enum in eda-infra-rs has no `Inout` variant
+            // (I / O / Unknown only). Power pins are effectively inputs —
+            // driven from the supply, never driven by the cell — so `I`
+            // matches the simulator's "constant external driver" semantics.
+            // DVDD/DVSS/AVDD/AVSS are wafer.space-PDK power-pad naming.
+            return Direction::I;
+        }
         let cell_type = extract_cell_type(macro_name);
+        // Filler / endcap / fill1-10 / corner pads: upstream assumes these
+        // instantiate with `()` (no port connections) in post-P&R netlists,
+        // but the wafer.space `gf180mcu-project-template` wires
+        // VDD/VSS/DVDD/DVSS/etc. on every filler instance. Treat any wired
+        // pin on a known filler as a constant input — no logic effect.
+        if crate::gf180mcu_pdk::is_filler_cell(cell_type) {
+            return Direction::I;
+        }
         // Standard cells first (the hot path).
         for (ct, pins) in GF180MCU_PIN_TABLE {
             if *ct == cell_type {
@@ -504,6 +534,118 @@ endmodule
             nl.is_some(),
             "NetlistDB parse failed for chip_top pad ring — \
              pin table likely missing an entry",
+        );
+    }
+
+    #[test]
+    fn pin_provider_returns_directions_for_power_and_ground_pins() {
+        // Antenna / endcap / decoupling cells declare `inout VDD, VSS;` in
+        // their Verilog models; `build.rs` only parses `input` / `output`,
+        // so VDD / VSS were missing from the generated pin table. Real
+        // post-P&R netlists wire them — without the power-pin shortcut,
+        // NetlistDB parse panics on the first wired `.VDD(...)`.
+        let provider = GF180MCULeafPins;
+        let dir = |cell: &str, pin: &str| {
+            provider.direction_of(
+                &CompactString::from(cell),
+                &CompactString::from(pin),
+                None,
+            )
+        };
+        for pin in [
+            "VDD", "VSS", "VNW", "VPW", "VPB", "VNB", "VPWR", "VGND",
+            "DVDD", "DVSS", "AVDD", "AVSS",
+        ] {
+            // Shortcut is per-pin-name, not per-cell, so any cell works.
+            assert_eq!(
+                dir("gf180mcu_fd_sc_mcu7t5v0__antenna", pin),
+                Direction::I,
+                "{pin} should resolve to Direction::I on antenna"
+            );
+        }
+    }
+
+    #[test]
+    fn pin_provider_handles_wired_filler_and_corner_cells() {
+        // wafer.space `gf180mcu-project-template` post-P&R netlists wire
+        // power pins on every filler / corner / power-pad instance, e.g.
+        //   gf180mcu_fd_io__cor IO_CORNER_NE (.DVDD(VDD), .DVSS(VSS),
+        //                                     .VDD(VDD),  .VSS(VSS));
+        // Upstream assumed these always instantiate with `()` (no
+        // connections), so the pin table has no entry for filler pins.
+        // The filler-cell shortcut treats any pin on a known filler as
+        // Direction::I — the cell has no logic, so power/ground/signal
+        // are all "constant external driver" from the AIG's perspective.
+        let provider = GF180MCULeafPins;
+        let dir = |cell: &str, pin: &str| {
+            provider.direction_of(
+                &CompactString::from(cell),
+                &CompactString::from(pin),
+                None,
+            )
+        };
+        // Corner pad (`cor`) — wired with DVDD / DVSS / VDD / VSS.
+        for pin in ["DVDD", "DVSS", "VDD", "VSS"] {
+            assert_eq!(dir("gf180mcu_fd_io__cor", pin), Direction::I);
+        }
+        // IO filler — wired with VDD / VSS.
+        for pin in ["VDD", "VSS"] {
+            assert_eq!(dir("gf180mcu_fd_io__fill10", pin), Direction::I);
+        }
+        // Standard-cell filler / endcap — wired with VDD / VSS.
+        for pin in ["VDD", "VSS"] {
+            assert_eq!(dir("gf180mcu_fd_sc_mcu9t5v0__filltie", pin), Direction::I);
+            assert_eq!(dir("gf180mcu_fd_sc_mcu9t5v0__endcap", pin), Direction::I);
+        }
+        // wafer.space power pads — DVDD / DVSS instances themselves.
+        for pin in ["DVDD", "DVSS", "VDD", "VSS"] {
+            assert_eq!(dir("gf180mcu_ws_io__dvdd", pin), Direction::I);
+            assert_eq!(dir("gf180mcu_ws_io__dvss", pin), Direction::I);
+        }
+    }
+
+    #[test]
+    fn netlist_db_parses_wired_chip_top_pad_ring() {
+        // Same shape as the `_parses_chip_top_pad_ring` test above, but
+        // with realistic wired-up power/ground connections matching what
+        // OpenROAD emits in post-P&R netlists (`gf180mcu-project-template`
+        // LibreLane flow). Catches regressions where the pin table or
+        // shortcuts drift from real netlists.
+        const VERILOG: &str = r#"
+module chip_top(clk_PAD);
+  inout clk_PAD;
+  wire clk_core, mid, VDD, VSS;
+  // Logic-bearing pad — already covered by the pad pin table.
+  gf180mcu_fd_io__in_s clk_pad (.PAD(clk_PAD), .PU(1'b0), .PD(1'b0), .Y(clk_core));
+  // Antenna cell with wired `inout VDD, VNW, VPW, VSS`.
+  gf180mcu_fd_sc_mcu7t5v0__antenna ANTENNA_1 (
+      .I(clk_core), .VDD(VDD), .VNW(VDD), .VPW(VSS), .VSS(VSS)
+  );
+  // Inverter so the design is non-degenerate.
+  gf180mcu_fd_sc_mcu9t5v0__inv_1 U1 (.I(clk_core), .ZN(mid));
+  // Corner pad — wired DVDD / DVSS / VDD / VSS, no signal pins.
+  gf180mcu_fd_io__cor IO_CORNER_NE_INST (
+      .DVDD(VDD), .DVSS(VSS), .VDD(VDD), .VSS(VSS)
+  );
+  // IO filler — wired VDD / VSS.
+  gf180mcu_fd_io__fill10 IO_FILL_1 (.VDD(VDD), .VSS(VSS));
+  // Standard-cell filltie / endcap — wired VDD / VSS.
+  gf180mcu_fd_sc_mcu9t5v0__filltie FILLTIE_1 (.VDD(VDD), .VSS(VSS));
+  gf180mcu_fd_sc_mcu9t5v0__endcap  ENDCAP_1  (.VDD(VDD), .VSS(VSS));
+  // wafer.space power pads.
+  gf180mcu_ws_io__dvdd DVDD_INST (.DVDD(VDD), .DVSS(VSS), .VDD(VDD), .VSS(VSS));
+  gf180mcu_ws_io__dvss DVSS_INST (.DVDD(VDD), .DVSS(VSS), .VDD(VDD), .VSS(VSS));
+endmodule
+"#;
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            VERILOG,
+            Some("chip_top"),
+            &GF180MCULeafPins,
+        );
+        assert!(
+            nl.is_some(),
+            "NetlistDB parse failed for wired chip_top pad ring — \
+             power-pin or filler-cell shortcut missing",
         );
     }
 

@@ -57,6 +57,26 @@ the authoritative record.
 - **`opensta-to-ir` golden-IR regression corpus** (WS4, commits
   `90558bb` / `6997096` / `9e25bc2`): seed entry `aigpdk_dff_chain` covers
   all four IR record types; runner + regen helper + CI hookup in place.
+- **GF180MCU power-pin + wired-filler shortcuts** in
+  `GF180MCULeafPins::direction_of`. Phase 6 left two gaps that only
+  surfaced on real post-P&R chip-top netlists (`gf180mcu-project-
+  template` / wafer.space LibreLane flow): (1) Verilog cell models
+  declare power as `inout VDD, VSS;`, but `build.rs` only parses
+  `input`/`output` — so the generated pin table lacked VDD/VSS
+  entries, panicking on the first `.VDD(...)` wired in
+  `antenna`/`endcap`/`fillcap`/etc.; (2) `cor`/`fill*`/`dvdd`/`dvss`
+  etc. were assumed to instantiate with empty port lists, but real
+  netlists wire all four power pins on every filler instance. New
+  short-circuit ahead of the pin-table lookup: any pin named
+  `VDD`/`VSS`/`VNW`/`VPW`/`VPB`/`VNB`/`VPWR`/`VGND`/`DVDD`/`DVSS`/
+  `AVDD`/`AVSS` resolves to `Direction::I` (constant external
+  driver — the enum has no `Inout`), and any pin on a known filler
+  cell falls through to the same. Three new tests in
+  `gf180mcu::tests` cover the power-pin shortcut, the wired-filler
+  shortcut, and a realistic chip-top fixture matching the
+  `gf180mcu-project-template` netlist shape. Advances Phase 7 of
+  the GF180MCU enablement plan from "synthetic fixtures only" to
+  "real wafer.space post-P&R netlists parse end-to-end".
 
 ### Changed
 
