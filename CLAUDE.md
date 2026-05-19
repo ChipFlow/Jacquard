@@ -170,6 +170,23 @@ uv run netlist-graph path tests/timing_test/minimal_build/6_final.v "gpio_in[40]
 
 See `docs/timing-violations.md` for the full guide on enabling GPU-side setup/hold violation checks, interpreting violation reports, and tracing violations back to source signals using `netlist_graph`.
 
+## Python tooling
+
+Python tools (PDK fetchers, build scripts, harness utilities) belong in
+the workspace's `uv` dev dependency group, not as ad-hoc system pip
+installs. Add them under `[dependency-groups].dev` in the root
+`pyproject.toml`; install with `uv sync --group dev`; invoke via
+`uv run <tool>`. CI mirrors this — see the dev group declarations and
+PDK install steps in `.github/workflows/ci.yml`.
+
+PDK Liberty / tech files are fetched via **volare** (pinned in
+`[tool.jacquard.pdks.*]` in the root `pyproject.toml`, hashes mirrored
+into `crates/opensta-to-ir/tests/opensta_integration.rs`). Volare has
+been renamed to **ciel** upstream
+(<https://github.com/fossi-foundation/ciel>) — the existing `volare`
+PyPI package still works at the pinned version, but a migration to the
+`ciel` package is open follow-up.
+
 ## Releases
 
 Cutting a release is a lightweight, manual procedure: roll the
