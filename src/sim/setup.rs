@@ -131,14 +131,17 @@ pub fn load_design(args: &DesignArgs) -> LoadedDesign {
         }
     };
 
-    // P3a: runtime_lib is wired into the netlist reader above; the
-    // AIG-construction-side consultation (manifest `kind = "ram"` →
-    // opaque-RAM `RAMBlock`) lands in P3b. Until then, unknown cells
-    // continue to fall through the existing AIGPDK fallback —
-    // sufficient for the cell-library CLI surface area to compile,
-    // not yet sufficient to unblock third-party SRAM macros.
-    let mut aig = AIG::from_netlistdb(&netlistdb);
-    let _ = &runtime_lib; // silence unused warning until P3b
+    // Runtime cell library is consulted both for pin tables (above,
+    // via ChainedPinProvider) and for `kind` metadata (here, by
+    // AIG::from_netlistdb_with_cells). For `kind = "ram"` cells
+    // outside the vendored PDKs, AIG construction allocates opaque
+    // RAMBlock slots whose outputs are X-source. See ADR 0010.
+    let cell_lib_ref = if runtime_lib.is_empty() {
+        None
+    } else {
+        Some(&runtime_lib)
+    };
+    let mut aig = AIG::from_netlistdb_with_cells(&netlistdb, cell_lib_ref);
 
     // Load display format info from JSON if available
     let json_path = args
