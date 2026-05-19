@@ -119,6 +119,15 @@ struct SimArgs {
     #[clap(long)]
     sdf_debug: bool,
 
+    /// Path to a user-supplied Verilog cell library. Repeatable. Each
+    /// file is parsed at startup; modules found in it become known to
+    /// the netlist reader without vendoring. If a sibling
+    /// `<file>.cells.toml` manifest is present, its per-cell `kind`
+    /// annotations are loaded automatically. See ADR 0010 and
+    /// `docs/plans/declarative-cell-metadata.md`.
+    #[clap(long = "cell-library", value_name = "PATH")]
+    cell_library: Vec<PathBuf>,
+
     /// Path to a Jacquard timing-IR (.jtir) file. Generate with the
     /// `opensta-to-ir` preprocessing tool. Mutually exclusive with `--sdf`.
     #[clap(long)]
@@ -257,6 +266,11 @@ struct CosimArgs {
     /// Number of cycles to dump DFF states for (used with --dump-dff).
     #[clap(long, default_value = "20")]
     dump_dff_cycles: usize,
+
+    /// Path to a user-supplied Verilog cell library. Repeatable. See
+    /// `jacquard sim --help` and ADR 0010 for details.
+    #[clap(long = "cell-library", value_name = "PATH")]
+    cell_library: Vec<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -317,6 +331,7 @@ fn cmd_sim(args: SimArgs) {
         liberty: args.liberty.clone(),
         timing_ir: args.timing_ir.clone(),
         timing_corner: args.timing_corner.clone(),
+        cell_library: args.cell_library.clone(),
     };
 
     #[allow(unused_mut)]
@@ -1464,6 +1479,7 @@ fn cmd_dump_paths(args: DumpPathsArgs) {
         liberty: args.liberty.clone(),
         timing_ir: args.timing_ir.clone(),
         timing_corner: None,
+        cell_library: Vec::new(),
     };
 
     let mut design = setup::load_design(&design_args);
@@ -1547,6 +1563,7 @@ fn cmd_cosim(args: CosimArgs) {
             liberty: None,
             timing_ir: args.timing_ir.clone(),
             timing_corner: None,
+            cell_library: args.cell_library.clone(),
         };
 
         let mut design = setup::load_design(&design_args);

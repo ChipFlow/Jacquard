@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::aig::{DriverType, AIG};
 use crate::aigpdk::AIGPDKLeafPins;
+use crate::cell_library::{ChainedPinProvider, RuntimeCellLibrary};
 use crate::display::extract_display_info_from_json;
 use crate::flatten::FlattenedScriptV1;
 use crate::pe::{process_partitions, Partition};
@@ -40,6 +41,13 @@ pub struct DesignArgs {
     /// that name is selected; when unset, corner index 0 (the first
     /// declared corner) is used.
     pub timing_corner: Option<String>,
+    /// User-supplied Verilog cell library files. Each is parsed at
+    /// startup via `sverilogparse` and made available to the netlist
+    /// reader through `ChainedPinProvider`. Sibling
+    /// `<file>.cells.toml` manifests are autoloaded for per-cell
+    /// `kind` annotations. See ADR 0010 and
+    /// `docs/plans/declarative-cell-metadata.md`.
+    pub cell_library: Vec<PathBuf>,
 }
 
 /// Result of loading a design: everything needed for simulation.
@@ -65,31 +73,72 @@ pub fn load_design(args: &DesignArgs) -> LoadedDesign {
         panic!("Mixed cells from multiple PDKs in netlist not supported");
     }
 
+    // Load any user-supplied runtime cell libraries (`--cell-library`).
+    // Empty when no flags were passed; in that case the chained
+    // provider degenerates to its built-in fallback.
+    let runtime_lib = if args.cell_library.is_empty() {
+        RuntimeCellLibrary::default()
+    } else {
+        let loaded = RuntimeCellLibrary::from_files(&args.cell_library)
+            .unwrap_or_else(|e| panic!("loading --cell-library: {e}"));
+        clilog::info!(
+            "Loaded {} cell-library pin entries, {} kind annotations from --cell-library",
+            loaded.pin_entry_count(),
+            loaded.kind_entry_count()
+        );
+        loaded
+    };
+
     let netlistdb = match lib {
-        CellLibrary::SKY130 => NetlistDB::from_sverilog_file(
-            &args.netlist_verilog,
-            args.top_module.as_deref(),
-            &SKY130LeafPins,
-        )
-        .expect("cannot build netlist"),
+        CellLibrary::SKY130 => {
+            let provider = ChainedPinProvider {
+                runtime: &runtime_lib,
+                fallback: &SKY130LeafPins,
+            };
+            NetlistDB::from_sverilog_file(
+                &args.netlist_verilog,
+                args.top_module.as_deref(),
+                &provider,
+            )
+            .expect("cannot build netlist")
+        }
         // GF180MCU (7t5v0 + 9t5v0). Combinational + sequential paths
         // (DFFs, latches, scan, clock-gating) are all wired through
         // `AIG::from_netlistdb` → `gf180mcu_postprocess`.
-        CellLibrary::GF180MCU => NetlistDB::from_sverilog_file(
-            &args.netlist_verilog,
-            args.top_module.as_deref(),
-            &crate::gf180mcu::GF180MCULeafPins,
-        )
-        .expect("cannot build netlist"),
-        CellLibrary::AIGPDK | CellLibrary::Mixed => NetlistDB::from_sverilog_file(
-            &args.netlist_verilog,
-            args.top_module.as_deref(),
-            &AIGPDKLeafPins(),
-        )
-        .expect("cannot build netlist"),
+        CellLibrary::GF180MCU => {
+            let provider = ChainedPinProvider {
+                runtime: &runtime_lib,
+                fallback: &crate::gf180mcu::GF180MCULeafPins,
+            };
+            NetlistDB::from_sverilog_file(
+                &args.netlist_verilog,
+                args.top_module.as_deref(),
+                &provider,
+            )
+            .expect("cannot build netlist")
+        }
+        CellLibrary::AIGPDK | CellLibrary::Mixed => {
+            let provider = ChainedPinProvider {
+                runtime: &runtime_lib,
+                fallback: &AIGPDKLeafPins(),
+            };
+            NetlistDB::from_sverilog_file(
+                &args.netlist_verilog,
+                args.top_module.as_deref(),
+                &provider,
+            )
+            .expect("cannot build netlist")
+        }
     };
 
+    // P3a: runtime_lib is wired into the netlist reader above; the
+    // AIG-construction-side consultation (manifest `kind = "ram"` →
+    // opaque-RAM `RAMBlock`) lands in P3b. Until then, unknown cells
+    // continue to fall through the existing AIGPDK fallback —
+    // sufficient for the cell-library CLI surface area to compile,
+    // not yet sufficient to unblock third-party SRAM macros.
     let mut aig = AIG::from_netlistdb(&netlistdb);
+    let _ = &runtime_lib; // silence unused warning until P3b
 
     // Load display format info from JSON if available
     let json_path = args
