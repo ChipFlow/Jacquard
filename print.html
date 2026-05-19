@@ -1898,7 +1898,22 @@ every integration point.</p>
 SRAMs). Supporting a foundry PDK like SKY130 requires teaching the simulator how
 to interpret the PDK's standard cells: their pin directions, their boolean
 function, and which ones are sequential.</p>
-<p>The integration touches five areas:</p>
+<p>There are now <strong>two pathways</strong> for enabling new cells; pick based on what
+you're adding:</p>
+<ul>
+<li><strong>Built-in PDK enablement</strong> (this guide). For full standard-cell
+libraries — AND gates, DFFs, sequential cells with explicit AIG
+decomposition rules. Requires Rust code: pin tables, classifiers,
+decomposition functions, AIG builder hooks.</li>
+<li><strong>Runtime cell library</strong> (<code>--cell-library</code> + <code>.cells.toml</code>
+manifest). For third-party IP, hard macros, foundry memories, and
+any other cells that <em>don't</em> need new AIG decomposition rules — i.e.
+cells that act as opaque outputs (RAM macros), filler/cap blocks,
+or IO pads. See <strong>ADR 0010</strong> and <code>docs/plans/declarative-cell-metadata.md</code>
+for the recipe. <strong>No Jacquard PR required</strong> — users ship a manifest
+alongside their netlist.</li>
+</ul>
+<p>This guide covers the built-in pathway, which touches five areas:</p>
 <ol>
 <li><strong>Library detection</strong> -- recognizing cell names from a netlist</li>
 <li><strong>Pin direction provider</strong> -- telling the netlist parser which pins are inputs/outputs</li>
@@ -1906,6 +1921,9 @@ function, and which ones are sequential.</p>
 <li><strong>Behavioral decomposition</strong> -- converting PDK cells to AIG (AND/NOT) primitives</li>
 <li><strong>CLI wiring</strong> -- connecting it all together</li>
 </ol>
+<p>If you're adding just a memory macro or other behaviourally-opaque IP,
+<strong>skip ahead to "Adding third-party IP via runtime manifest"</strong> at the
+end of this document — it's a 6-line TOML entry, not a Rust PR.</p>
 <h2 id="prerequisites-1"><a class="header" href="#prerequisites-1">Prerequisites</a></h2>
 <p>You need:</p>
 <ul>
@@ -2180,6 +2198,61 @@ handle power pins as constants in the pin provider.</p>
 cells have names that collide with sequential cell prefixes, the whitelist
 approach prevents misclassification.</p>
 </li>
+</ul>
+<h2 id="adding-third-party-ip-via-runtime-manifest"><a class="header" href="#adding-third-party-ip-via-runtime-manifest">Adding third-party IP via runtime manifest</a></h2>
+<p>If you're adding a memory macro, IO pad, hard block, or filler library
+— anything that doesn't need new AIG decomposition rules — the runtime
+cell-library pathway (ADR 0010) is the right route. <strong>No Jacquard PR
+required.</strong> Ship a Verilog blackbox file plus a TOML manifest alongside
+your design.</p>
+<h3 id="step-1-provide-the-cells-verilog-interface"><a class="header" href="#step-1-provide-the-cells-verilog-interface">Step 1: Provide the cell's Verilog interface</a></h3>
+<p>The blackbox just declares the cell's module + port directions. The
+foundry typically ships this (<code>&lt;library&gt;__blackbox.v</code>). Example for the
+OCD GF180MCU SRAM:</p>
+<pre><code class="language-verilog">module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (CLK, CEN, GWEN, WEN, A, D, Q);
+  input CLK;
+  input CEN;
+  input GWEN;
+  input [7:0] WEN;
+  input [9:0] A;
+  input [7:0] D;
+  output [7:0] Q;
+endmodule
+</code></pre>
+<h3 id="step-2-write-the-toml-manifest"><a class="header" href="#step-2-write-the-toml-manifest">Step 2: Write the TOML manifest</a></h3>
+<p>Co-locate <code>&lt;library&gt;.cells.toml</code> next to <code>&lt;library&gt;.v</code> (it autoloads
+when present) or pass it via <code>--cell-manifest</code>:</p>
+<pre><code class="language-toml">schema_version = "1.0"
+
+[cells.gf180mcu_ocd_ip_sram__sram1024x8m8wm1]
+kind = "ram"
+</code></pre>
+<p>Recognised <code>kind</code> values in v1.0: <code>std</code>, <code>dff</code>, <code>latch</code>, <code>clock_gate</code>,
+<code>ram</code>, <code>filler</code>, <code>endcap</code>, <code>tap</code>, <code>io_pad_input</code>, <code>io_pad_output</code>,
+<code>io_pad_bidir</code>, <code>delay</code>, <code>multi_output</code>, <code>tie_high</code>, <code>tie_low</code>.</p>
+<h3 id="step-3-invoke-jacquard-with-the-manifest"><a class="header" href="#step-3-invoke-jacquard-with-the-manifest">Step 3: Invoke jacquard with the manifest</a></h3>
+<pre><code class="language-sh">jacquard sim my_chip.v stim.vcd out.vcd 1 \
+    --cell-library deps/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__blackbox.v
+</code></pre>
+<p>The <code>--cell-library</code> flag is repeatable for multi-IP designs.</p>
+<h3 id="what-kind--ram-delivers-in-v10"><a class="header" href="#what-kind--ram-delivers-in-v10">What <code>kind = "ram"</code> delivers in v1.0</a></h3>
+<p>The cell's output pins become X-source slots in the AIG. The SRAM's
+internal memory behaviour is <strong>not</strong> modelled in v1.0 — sufficient for
+designs whose CPU executes from boot ROM / register file and never
+reads SRAM contents at the timescales Jacquard simulates
+(the heartbeat-verification case driving this work). Real memory
+modelling lands in a future
+schema version with explicit port-mapping (<code>[cells.NAME.ports]</code>).</p>
+<h3 id="other-kinds"><a class="header" href="#other-kinds">Other kinds</a></h3>
+<ul>
+<li><code>filler</code>, <code>endcap</code>, <code>tap</code> — physical-only, contribute no logic.</li>
+<li><code>io_pad_input</code> / <code>io_pad_output</code> / <code>io_pad_bidir</code> — pad-level
+behaviour (parallel to the built-in <code>gf180mcu_ws_io__*</code> family).</li>
+<li><code>dff</code>, <code>latch</code>, <code>clock_gate</code>, <code>delay</code>, <code>multi_output</code> — recognised
+but the v1.0 schema doesn't yet expose enough port semantics to
+drive AIG construction for these. Coming in the port-mapping
+schema (future ADR). For now, declaring these kinds documents
+intent without changing behaviour.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting-vcd-input-issues"><a class="header" href="#troubleshooting-vcd-input-issues">Troubleshooting VCD Input Issues</a></h1>
 <p>This guide helps debug VCD input problems where GEM simulations produce incorrect results or warn about missing signals.</p>
@@ -3600,31 +3673,37 @@ gf180mcu), each gated on its respective volare PDK install.</li>
 </ul>
 <h2 id="follow-on-cleanup"><a class="header" href="#follow-on-cleanup">Follow-on cleanup</a></h2>
 <p>These are nice-to-have refactors flagged during the GF180MCU work
-but deliberately out of scope for the enablement effort itself:</p>
+but deliberately out of scope for the enablement effort itself.</p>
+<p><strong>Update 2026-05-19:</strong> Items 1, 2, and 4 are now subsumed by
+<a href="plans/../adr/0010-declarative-cell-metadata.html">ADR 0010 — Declarative cell metadata</a>
+and its companion plan <code>declarative-cell-metadata.md</code>. The manifest
+pathway converts these from "Rust refactor" projects into "move data
+out of code as part of the migration to manifest-as-source-of-truth"
+— happens once, gets all three at once.</p>
 <ol>
 <li>
-<p><strong><code>build.rs</code> pin-table generator for SKY130 too.</strong> <code>build.rs:: generate_gf180mcu_pin_table</code> is a new precedent — scan +
-parse + cross-assert. SKY130 still uses hand-rolled match arms
-in <code>src/sky130.rs</code>. Porting SKY130 to the same mechanism would
-remove ~200 LOC of mechanically-maintained tables.</p>
+<p><strong><del><code>build.rs</code> pin-table generator for SKY130 too.</del></strong> Subsumed by
+ADR 0010 § "Deferred to a future ADR — <code>build.rs</code> pin-table
+scanner removal." Removed LAST in the manifest migration, after
+manifests cover the built-in PDKs.</p>
 </li>
 <li>
-<p><strong>Physical relocation of shared PDK decomp infrastructure</strong> out
-of <code>sky130_pdk.rs</code> into <code>pdk_decomp.rs</code>. Phase 4 satisfied this
-via re-exports + visibility bumps to <code>pub(crate)</code>; the real move
-is deferred until a third PDK exercises the API surface.</p>
+<p><strong><del>Physical relocation of shared PDK decomp infrastructure</del></strong> out
+of <code>sky130_pdk.rs</code> into <code>pdk_decomp.rs</code>. Still relevant for the
+built-in (Rust-decomp) pathway, since ADR 0010 keeps that path
+load-bearing for cells with real AIG decomposition rules. Move
+when a third PDK exercises the surface.</p>
 </li>
 <li>
 <p><strong><code>CellLibrary</code> enum location.</strong> Currently lives in <code>src/sky130.rs</code>
 even though it represents all PDKs. Moving to a neutral home
-(<code>src/pdk.rs</code> or <code>src/lib.rs</code>) is a trivial mechanical refactor.</p>
+(<code>src/pdk.rs</code> or <code>src/lib.rs</code>) is a trivial mechanical refactor.
+Independent of ADR 0010.</p>
 </li>
 <li>
-<p><strong>IO and PR libraries.</strong> <code>gf180mcu_fd_io</code> (pads, levelshifters)
-and <code>gf180mcu_fd_pr</code> (primitives — diodes, R/C, antenna cells)
-appear in real post-P&amp;R netlists. Treated like <code>tap</code>/<code>fill</code>/<code>decap</code>
-today (recognised but stubbed); will need richer modelling when
-wafer.space test-run-1 designs arrive (Phase 7).</p>
+<p><strong><del>IO and PR libraries.</del></strong> Now solved by the ADR 0010 manifest
+pathway. <code>gf180mcu_fd_io</code> and <code>gf180mcu_fd_pr</code> cells can be
+declared via <code>kind = "io_pad_*"</code> / <code>kind = "filler"</code> / <code>kind = "tap"</code> etc. in user-supplied manifests — no Jacquard PR needed.</p>
 </li>
 <li>
 <p><strong>CI install strategy for GF180MCU Liberty.</strong> Both the sky130 and
@@ -3632,7 +3711,7 @@ gf180mcu multi-corner tests currently skip when the PDK isn't
 installed locally. CI integration (volare-on-CI or a vendored
 minimal Liberty subset) is the same blocker that gates the
 <code>inv_chain_pnr</code> sky130 corpus entry — out of scope for the GF180
-enablement effort itself.</p>
+enablement effort itself. Unrelated to ADR 0010.</p>
 </li>
 </ol>
 <h2 id="pitfalls-pdk-specific-for-future-readers"><a class="header" href="#pitfalls-pdk-specific-for-future-readers">Pitfalls (PDK-specific, for future readers)</a></h2>

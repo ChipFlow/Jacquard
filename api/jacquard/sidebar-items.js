@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["aig","aigpdk","display","event_buffer","flatten","gf180mcu","gf180mcu_pdk","liberty_parser","pdk","pdk_decomp","pe","repcut","sim","sky130","sky130_pdk","staging","testbench","timing_report"]};
+window.SIDEBAR_ITEMS = {"mod":["aig","aigpdk","cell_library","display","event_buffer","flatten","gf180mcu","gf180mcu_pdk","liberty_parser","pdk","pdk_decomp","pe","repcut","sim","sky130","sky130_pdk","staging","testbench","timing_report"]};
