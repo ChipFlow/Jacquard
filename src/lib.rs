@@ -51,6 +51,8 @@ pub mod gf180mcu_pdk;
 
 pub mod pdk;
 
+pub mod cell_library;
+
 pub mod pdk_decomp;
 
 pub mod aig;
