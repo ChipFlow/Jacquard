@@ -1,0 +1,250 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>0003 — OpenTimer as in-process reference STA (Superseded) - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="adr-0003--opentimer-as-in-process-reference-sta"><a class="header" href="#adr-0003--opentimer-as-in-process-reference-sta">ADR 0003 — OpenTimer as in-process reference STA</a></h1>
+<p><strong>Status:</strong> Superseded (2026-05-01). Spike (<code>../spikes/opentimer-sky130.md</code>) failed Q2 — OpenTimer's input pipeline cannot handle real OpenROAD-flow <code>.v</code>/<code>.spef</code> for SKY130 designs with bus ports. Fallback is OpenSTA subprocess validation only (ADR 0001); a future ADR may revisit libreda-sta or an in-house walker if an in-process reference is wanted later.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Jacquard needs an in-process reference STA path to:</p>
+<ul>
+<li>Validate SDF-derived timing against an independent computation at load time and on demand (requirement R2 in <code>timing-correctness.md</code>).</li>
+<li>Provide exact per-edge arrival for top-K critical paths (requirement R4, pessimism-delta reporting).</li>
+</ul>
+<p>OpenSTA (ADR 0001) is the ground-truth oracle but runs only as a subprocess — unsuitable for per-run, in-process checking. A linked alternative is needed.</p>
+<p>Options surveyed:</p>
+<ul>
+<li><strong>OpenTimer</strong> (MIT, C++17). Parses <code>.lib</code> / <code>.v</code> / <code>.spef</code> / <code>.sdc</code> directly. Won TAU Timing Analysis Contests (2014 1st, 2015 2nd, 2016 1st); industry "Golden Timer" for benchmark comparisons. Actively maintained (latest push 2025-12-26 as of this writing). Does not parse SDF — timing is computed from Liberty + parasitics.</li>
+<li><strong>libreda-sta</strong> (Rust, permissive). Young framework, self-described as "basic components." Unknown whether it handles SKY130 Liberty robustly. Lower maturity risk than OpenTimer.</li>
+<li><strong>Tatum</strong> (MIT, C++). Analysis engine only; does not parse Liberty/SDF/Verilog. Using Tatum would require supplying our own parsers, so it does not solve the problem directly.</li>
+<li><strong>In-house Rust walker.</strong> Author-shared blind spots with Jacquard's main pipeline reduce the independence benefit.</li>
+</ul>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p><strong>Subject to the spike's success</strong>, OpenTimer becomes Jacquard's in-process reference STA, integrated via C++ FFI (<code>bindgen</code> or equivalent).</p>
+<ul>
+<li>Linked directly; MIT licence satisfies <code>project-scope.md</code>.</li>
+<li>Computes timing from <code>.lib</code> + <code>.spef</code> independently of any SDF-derived path. This is an accepted (and arguably preferable) property: the reference path shares no parsing with Jacquard's SDF consumer, so a parse bug on either side is detectable rather than mutually masked.</li>
+<li>Emits timing IR (per ADR 0002) so its output is directly diffable against Jacquard's SDF-derived IR.</li>
+</ul>
+<p>Spike criteria in <code>../spikes/opentimer-sky130.md</code>. On spike failure, fallback is to drop the in-process reference entirely and rely on OpenSTA subprocess validation (ADR 0001). This weakens per-PR feedback on timing correctness but is not fatal.</p>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<ul>
+<li>C++ FFI dependency; <code>bindgen</code>-generated bindings; build complexity rises modestly.</li>
+<li>Direct linking preserves permissive licensing (MIT).</li>
+<li>Three-way cross-check becomes the default in CI: Jacquard (SDF path) vs OpenTimer (Liberty+SPEF path) vs OpenSTA (subprocess, full ground truth). Three-way disagreement localises bugs to SDF parse / delay model / tool issue cleanly.</li>
+<li>OpenTimer does not parse SDF. To use it in Jacquard's current flow, OpenLane2 (or equivalent) must produce SPEF alongside SDF. This plumbing change is tracked in the phase-0 plan.</li>
+<li>OpenTimer's maturity is measured in contest benchmarks, not SKY130/GF130 real-flow output. Spike must verify it handles our actual Liberty and SPEF. The spike is structured to fail fast if it does not.</li>
+<li>If OpenTimer is dropped post-spike, alternative in-process references (libreda-sta, in-house) can be revisited; this ADR would be superseded rather than amended.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>../project-scope.md</code> — licensing constraint, validation constraint.</li>
+<li><code>../timing-correctness.md</code> — requirement R2, requirement R4.</li>
+<li><code>../spikes/opentimer-sky130.md</code> — spike and success criteria.</li>
+<li>ADR 0001 — OpenSTA oracle.</li>
+<li>ADR 0002 — timing IR (OpenTimer emits it).</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../adr/0002-timing-ir.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../adr/0004-private-pdk-testing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../adr/0002-timing-ir.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../adr/0004-private-pdk-testing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

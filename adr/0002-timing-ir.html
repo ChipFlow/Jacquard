@@ -1,0 +1,251 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>0002 — Timing intermediate representation - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="adr-0002--timing-intermediate-representation"><a class="header" href="#adr-0002--timing-intermediate-representation">ADR 0002 — Timing intermediate representation</a></h1>
+<p><strong>Status:</strong> Accepted.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Jacquard currently parses SDF directly in <code>src/sdf_parser.rs</code>, a hand-rolled parser that has accumulated reactive fixes (empty <code>()</code> delays, <code>(COND …)</code> pin specs, backslash escapes, edge-qualified timing checks, TIMINGCHECK stripping workarounds for OpenLane2 output). Each new production failure has been a one-off patch.</p>
+<p>Commercial tool output adds dialect variation (Cadence, Synopsys extensions). Future parser paths (Liberty, SPEF) and future reference tools (OpenSTA, OpenTimer) each carry their own data models. A format-per-consumer coupling structure will continue to spread parser complexity into the simulator.</p>
+<p>The project needs:</p>
+<ul>
+<li>A stable format we consume, with parser complexity isolated from simulator complexity.</li>
+<li>A format that can be diffed between producers (two parsers of the same file must agree).</li>
+<li>A format that supports multi-corner PVT values natively — commercial flows require this; single-corner shortcuts become retrofit pain.</li>
+<li>Preservation of vendor-specific annotations so information is not silently discarded.</li>
+<li>Fast consumption at sim startup (SDF parsing is currently on the critical path).</li>
+</ul>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p>Introduce a timing intermediate representation (timing IR) for SDF-equivalent annotation data.</p>
+<ul>
+<li><strong>Binary format:</strong> FlatBuffers. Zero-copy reads, schema evolution, cross-language (Rust, C++ for OpenTimer adapter, Python for tooling).</li>
+<li><strong>Text sidecar:</strong> JSON, produced via FlatBuffers' JSON round-trip, for CI diffs and human inspection.</li>
+<li><strong>Schema versioning:</strong> explicit version field, compatible-evolution rules stated in schema comments. Breaking changes require a major version bump and migration notes.</li>
+<li><strong>Multi-corner native:</strong> timing values are min / typ / max across a declared set of PVT corners. Single-corner designs are represented as a single-element corner set.</li>
+<li><strong>Vendor extension passthrough:</strong> typed <code>VendorExtension</code> variants (<code>VendorCadence</code>, <code>VendorSynopsys</code>, <code>VendorOther</code>) carry unrecognised annotations as byte-typed blobs with source labels. Consumers opt in to understanding them; the IR never silently drops them.</li>
+<li><strong>Per-arc provenance:</strong> each timing arc records source tool, source file, and origin category — <code>asserted</code> (from SDF / input), <code>computed</code> (derived by an STA tool), <code>defaulted</code> (fallback because no better value was available). Provenance is inspectable at consumer side.</li>
+<li><strong>Scope boundary:</strong> the IR represents <em>timing annotation data only</em>. It is <strong>not</strong> a netlist representation, <strong>not</strong> a timing graph, <strong>not</strong> cell characterization. Attempts to extend it toward those adjacent formats are rejected — they become separate IRs if needed.</li>
+</ul>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<ul>
+<li>A new schema and format to maintain. Scope discipline is load-bearing: if the IR creeps toward being a full STA framework, it becomes duplicate work with OpenSTA/OpenTimer.</li>
+<li>Parser complexity moves out of <code>src/sdf_parser.rs</code> (and its future rewrite, per ADR covering #3) into a focused converter crate. Unit-testable in isolation.</li>
+<li>A diff-based test corpus becomes natural: multiple converters on the same input must produce equivalent IR. This is the enforcement mechanism for ADR 0001's oracle pattern.</li>
+<li>Vendor extensions do not require Jacquard code changes — only converter updates.</li>
+<li>Startup parse cost drops: reading binary IR is near-instant. SDF-to-IR conversion becomes a one-time preprocessing step, not repeated per sim.</li>
+<li>Adopting FlatBuffers adds a code-generation step to the build, via <code>flatc</code>. Build hygiene (checked-in generated code, pinned <code>flatc</code> version, or a build-script integration) is required.</li>
+<li>If the IR is ever shared across other tooling beyond Jacquard, its stability contract tightens. Flagged in open questions on <code>timing-correctness.md</code>; not resolved here.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>../project-scope.md</code> — validation and permissive-license constraints.</li>
+<li><code>../timing-correctness.md</code> — requirement R1, principle P5 (multi-corner).</li>
+<li>ADR 0001 — OpenSTA oracle (IR is the diff format).</li>
+<li>ADR 0003 — <strong>Superseded.</strong> OpenTimer was the proposed in-process reference STA; spike Q2 fail moved Jacquard to OpenSTA-only via <code>opensta-to-ir</code>. See <code>../spikes/opentimer-sky130.md</code>.</li>
+<li>ADR 0004 — private PDK testing (IR enables portable fixtures without leaking PDK data).</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../adr/0001-opensta-as-oracle.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../adr/0003-opentimer-primary-sta.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../adr/0001-opensta-as-oracle.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../adr/0003-opentimer-primary-sta.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

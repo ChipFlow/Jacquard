@@ -1,0 +1,476 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>GF180MCU PDK enablement - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="plan--gf180mcu-pdk-enablement-full-sim-path"><a class="header" href="#plan--gf180mcu-pdk-enablement-full-sim-path">Plan — GF180MCU PDK enablement (full sim path)</a></h1>
+<p><strong>Status:</strong> Phases 0–6 shipped (2026-05-12 / 13). Phase 7
+(wafer.space test-run-1 design integration) deferred pending design
+availability. Subsequent follow-ups also landed (2026-05-14):
+IO pad behavioural decomposition (<code>__in_c</code>, <code>__in_s</code>, <code>__bi_24t</code>,
+plus filler classification for the wafer.space <code>gf180mcu_ws_*</code>
+families) and bidir A/OE observability surfacing as
+<code>&lt;port&gt;__out</code> / <code>&lt;port&gt;__oe</code> extra primary outputs — see commits
+<code>aa312b8</code>, <code>c23d583</code>, <code>207cc80</code>. These extended GF180MCU support
+from "synthesized-core-only" to "full chip_top including pad ring",
+validated end-to-end on a 227k-cell wafer.space chess chip_top
+netlist. This document is now a recap of what landed; the
+forward-looking deferred items are in § Follow-on cleanup at the
+bottom.</p>
+<p><strong>Predecessors:</strong></p>
+<ul>
+<li>SKY130 enablement (reference recipe in <code>docs/adding-a-pdk.md</code>).</li>
+<li>Multi-corner Liberty plumbing — WS2.4 + the sky130 multi-corner
+integration test (<code>crates/opensta-to-ir/tests/opensta_integration.rs</code>),
+shipped 2026-05-12.</li>
+</ul>
+<p><strong>ADRs:</strong> None new shipped. <code>docs/adding-a-pdk.md</code> is the canonical
+integration-points checklist; this plan applied that recipe to
+GF180MCU with both 7-track (<code>gf180mcu_fd_sc_mcu7t5v0</code>) and 9-track
+(<code>gf180mcu_fd_sc_mcu9t5v0</code>) standard-cell libraries.</p>
+<h2 id="goal-as-shipped"><a class="header" href="#goal-as-shipped">Goal (as shipped)</a></h2>
+<p>GF180MCU is now at the same support tier as SKY130:</p>
+<ol>
+<li><strong>Timing path</strong> — <code>opensta-to-ir</code> accepts GF180MCU Liberty files
+and emits IR; the multi-corner integration test at
+<code>crates/opensta-to-ir/tests/opensta_integration.rs::gf180mcu_multi_corner_emits_per_corner_values</code>
+asserts per-corner setup/hold values differ correctly across
+tt/ss/ff PVT corners.</li>
+<li><strong>Simulation path</strong> — <code>jacquard sim</code> runs gate-level GF180MCU
+netlists on the GPU. Cell-type detection, pin direction tables,
+sequential/tie/multi-output classification, behavioural model
+parsing (with UDP support for sequential elements), and AIG
+decomposition are all wired through <code>AIG::from_netlistdb</code>.</li>
+<li><strong>Validation</strong> — synthetic DFF+inverter fixture at
+<code>tests/timing_test/gf180mcu_timing/</code>. Real wafer.space test-run-1
+design integration is deferred (Phase 7, gated on design
+availability).</li>
+</ol>
+<p>End state mirrors today's SKY130 support: <code>CellLibrary::GF180MCU</code>
+detected, decomposed to AIG, simulated on Metal/CUDA/HIP, with a
+golden-IR corpus entry covering the timing-IR side.</p>
+<h2 id="why-now"><a class="header" href="#why-now">Why now</a></h2>
+<p>GF180MCU support was a release prerequisite per session 2026-05-12.
+The wafer.space ecosystem (https://github.com/wafer-space/gf180mcu)
+is the near-term commercial demand driver; the upstream
+<a href="https://github.com/google/gf180mcu-pdk">google/gf180mcu-pdk</a> is the
+canonical PDK that the wafer.space variant builds on.</p>
+<h2 id="decisions-frozen-2026-05-12-session"><a class="header" href="#decisions-frozen-2026-05-12-session">Decisions (frozen 2026-05-12 session)</a></h2>
+<ol>
+<li><strong>One enum variant for GF180MCU.</strong> <code>CellLibrary::GF180MCU</code> covers
+both 7t5v0 and 9t5v0 prefixes. Matches the SKY130 precedent
+(<code>CellLibrary::SKY130</code> covers seven prefixes).</li>
+<li><strong>Both 7t and 9t fully supported.</strong> Unlike SKY130 (only hd is
+decomposed), both GF180MCU standard-cell variants are first-class
+for cell detection, pin direction, classification, and AIG
+decomposition. Cell models for 7t and 9t are byte-identical per
+cell type (verified at build time in <code>build.rs</code>); decomposition
+reads from the 7t submodule and reuses for 9t.</li>
+<li><strong>Two separate submodules</strong> for vendoring cell models, mirroring
+the per-library SKY130 split:
+<ul>
+<li><code>vendor/gf180mcu_fd_sc_mcu7t5v0/</code></li>
+<li><code>vendor/gf180mcu_fd_sc_mcu9t5v0/</code></li>
+</ul>
+</li>
+<li><strong>Install path:</strong> <code>volare</code> pinned hash under
+<code>[tool.jacquard.pdks.gf180mcu]</code> in <code>pyproject.toml</code> alongside the
+existing sky130 entry. Variant: <code>gf180mcuC</code>.</li>
+<li><strong>Reset polarity:</strong> GF180MCU uses <strong>active-low</strong> resets/sets
+(pin names <code>RN</code>, <code>SETN</code>) — same AIG formula shape as SKY130's
+<code>RESET_B</code>/<code>SET_B</code>. The "n" <em>prefix</em> in cell names like
+<code>dffnq</code>/<code>dffnrnq</code>/<code>icgtn</code> indicates a <strong>negative-edge clock</strong>
+(pin <code>CLKN</code>), not reset polarity (resolving Open Q3 from the
+original plan).</li>
+</ol>
+<h2 id="shipped-phases"><a class="header" href="#shipped-phases">Shipped phases</a></h2>
+<h3 id="phase-0--foundations-commit-6ae3e54"><a class="header" href="#phase-0--foundations-commit-6ae3e54">Phase 0 — Foundations (commit <code>6ae3e54</code>)</a></h3>
+<ul>
+<li><code>pyproject.toml</code>: <code>[tool.jacquard.pdks.gf180mcu]</code> with
+<code>volare_hash = "559a117b163cef2f920f33f30f6f690aa0b47e4c"</code>, variant
+<code>gf180mcuC</code>, separate <code>default_lib_subdir_7t</code> /
+<code>default_lib_subdir_9t</code> paths.</li>
+<li>Vendored submodules at <code>vendor/gf180mcu_fd_sc_mcu7t5v0/</code> and
+<code>vendor/gf180mcu_fd_sc_mcu9t5v0/</code>.</li>
+<li>Skeleton <code>src/gf180mcu.rs</code> + <code>src/gf180mcu_pdk.rs</code> declared in
+<code>src/lib.rs</code>.</li>
+</ul>
+<h3 id="phase-1--library-detection--cell-type-extraction-commit-858dd70"><a class="header" href="#phase-1--library-detection--cell-type-extraction-commit-858dd70">Phase 1 — Library detection + cell-type extraction (commit <code>858dd70</code>)</a></h3>
+<ul>
+<li><code>is_gf180mcu_cell(name) -&gt; bool</code> matching both 7t5v0 and 9t5v0
+prefixes.</li>
+<li><code>extract_cell_type(name)</code> strips prefix + drive suffix.</li>
+<li><code>CellLibrary::GF180MCU</code> enum value added; <code>detect_library()</code> /
+<code>detect_library_from_file()</code> extended; <code>Mixed</code> enforcement
+upgraded to three known libraries.</li>
+</ul>
+<h3 id="phase-2--pin-direction-provider-commit-e97e2d2"><a class="header" href="#phase-2--pin-direction-provider-commit-e97e2d2">Phase 2 — Pin direction provider (commit <code>e97e2d2</code>)</a></h3>
+<ul>
+<li><code>GF180MCULeafPins</code> implementing <code>LeafPinProvider</code>.</li>
+<li>Generation strategy: <strong>build-time</strong> via <code>build.rs::generate_gf180mcu_pin_table</code>,
+which scans <code>vendor/gf180mcu_fd_sc_mcu{7,9}t5v0/cells/</code>, parses
+<code>.functional.v</code>, cross-asserts 7t/9t pin layouts match, emits
+<code>$OUT_DIR/gf180mcu_pins.rs</code>. New precedent vs SKY130's
+hand-rolled match arms (see § Follow-on cleanup item 1).</li>
+<li>Round-trip test instantiating every cell.</li>
+</ul>
+<h3 id="phase-3--cell-classification-commit-6969b90"><a class="header" href="#phase-3--cell-classification-commit-6969b90">Phase 3 — Cell classification (commit <code>6969b90</code>)</a></h3>
+<ul>
+<li>Sequential / tie / filler / delay-cell whitelists in
+<code>src/gf180mcu_pdk.rs</code> derived from behavioural models.</li>
+<li>Unit tests asserting classification across the union of 7t5v0 and
+9t5v0 cell catalogues.</li>
+</ul>
+<h3 id="phase-4--combinational-aig-decomposition"><a class="header" href="#phase-4--combinational-aig-decomposition">Phase 4 — Combinational AIG decomposition</a></h3>
+<p>Sequenced as four commits:</p>
+<ul>
+<li><code>92bb665</code> — Phase 4 recon: confirmed SKY130 behavioural parser is
+PDK-neutral; identified shared infrastructure that
+<code>gf180mcu_pdk</code> could reuse.</li>
+<li><code>02da077</code> — Phase 4 prep: introduced the PDK-neutral
+<code>src/pdk_decomp.rs</code> re-export module; exposed <code>WireVal</code>,
+<code>GATE_MARKER</code>, <code>build_chain_gate</code>, <code>build_xor_chain</code>,
+<code>finalize_decomp_result</code> as <code>pub(crate)</code>.</li>
+<li><code>32fb3b9</code> — Phase 4 (combinational): <code>decompose_combinational</code> for
+GF180MCU + boolean equivalence test suite vs the vendored PDK
+models.</li>
+<li><code>d898343</code> — Phase 4 (aig.rs integration): wired combinational
+decomposition through <code>AIG::from_netlistdb</code>, end-to-end sim path
+for combinational GF180MCU netlists.</li>
+</ul>
+<h3 id="phase-4b--sequential-cells-udps"><a class="header" href="#phase-4b--sequential-cells-udps">Phase 4b — Sequential cells (UDPs)</a></h3>
+<ul>
+<li><code>a7c0618</code> — Phase 4b prep: UDP loader for <code>gf180mcu_pdk</code>
+(parses <code>UDP_GF018hv5v_mcu_sc7_TT_1P8V_25C_verilog_nonpg_*_FF_UDP</code>
+and friends from the vendored PDK).</li>
+<li><code>459317e</code> — Phase 4b: AIG hooks for sequential cells (DFFs,
+latches, scan-DFFs, clock-gating cells <code>icgtp</code>/<code>icgtn</code>).
+<code>gf180mcu_preprocess</code> pre-creates DFF Q pins; <code>gf180mcu_postprocess</code>
+applies async set/reset using the active-low RN/SETN convention
+via the same AIG formula as SKY130. Negative-edge clock cells
+use <code>CLKN</code> instead of <code>CLK</code> (handled in <code>trace_clock_pin</code>).</li>
+<li><code>3006f59</code> — Phase 4b boolean-equivalence tests covering DFF,
+latch, scan-DFF, and clock-gating cells via multi-step
+truth-table evaluation.</li>
+</ul>
+<h3 id="phase-5--cli--pipeline-wiring-audit-commit-57244d5"><a class="header" href="#phase-5--cli--pipeline-wiring-audit-commit-57244d5">Phase 5 — CLI / pipeline wiring audit (commit <code>57244d5</code>)</a></h3>
+<p>Audit-only — no per-PDK branch was missing GF180MCU handling. The
+auto-detection in <code>AIG::from_netlistdb</code> already covers every CLI
+surface (<code>sim</code> / <code>cosim</code> / <code>dump-paths</code> all route through
+<code>setup::load_design</code>). Cleanup: stale Phase 4b panic comments in
+<code>src/sim/setup.rs</code> and <code>src/aig.rs</code>; field doc comments on CLI
+arguments refreshed to mention GF180MCU alongside AIGPDK / SKY130.</p>
+<h3 id="phase-6--validation-fixture--multi-corner-test"><a class="header" href="#phase-6--validation-fixture--multi-corner-test">Phase 6 — Validation fixture + multi-corner test</a></h3>
+<ul>
+<li><strong>Fixture</strong> (commit <code>4a7ee0e</code>): <code>tests/timing_test/gf180mcu_timing/</code>
+mirroring <code>sky130_timing/</code> 1:1. Synthetic <code>inv_chain.v</code> (DFF +
+16-inverter chain + DFF) with <code>gf180mcu_fd_sc_mcu7t5v0__{dffq,inv}_1</code>
+cells, Liberty-only SDF generator, CVC testbench, sample stimulus,
+Makefile, README.</li>
+<li><strong>Integration test</strong>: <code>gf180mcu_multi_corner_emits_per_corner_values</code>
+in <code>crates/opensta-to-ir/tests/opensta_integration.rs</code>. Loads
+three real PVT corners (typ=<code>tt_025C_5v00</code>, slow=<code>ss_125C_4v50</code>,
+fast=<code>ff_n40C_5v50</code>) at the 5.0 V operating point and asserts
+per-corner setup TimingValues differ correctly across PVT.
+Skips gracefully when the volare-installed PDK isn't present
+(gated on <code>find_gf180mcu_lib_dir()</code> returning <code>Some</code>; matches
+the sky130 test's skip pattern). <code>$GF180MCU_LIBERTY_DIR</code> overrides
+the volare default path.</li>
+</ul>
+<h3 id="phase-7--waferspace-test-run-1-design-deferred"><a class="header" href="#phase-7--waferspace-test-run-1-design-deferred">Phase 7 — wafer.space test-run-1 design (deferred)</a></h3>
+<p>Gated on design availability. Scope:</p>
+<ul>
+<li>Vendor or pull a wafer.space test-run-1 gate-level netlist into
+the <code>tests/timing_test/</code> or <code>designs/</code> tree.</li>
+<li>End-to-end pipeline: synth + PnR (or consume post-PnR output),
+opensta-to-ir, jacquard sim with Metal backend, golden-output
+VCD comparison.</li>
+<li>Promote to a corpus entry once stable.</li>
+</ul>
+<h2 id="test-inventory"><a class="header" href="#test-inventory">Test inventory</a></h2>
+<p>Counts after Phase 6:</p>
+<ul>
+<li><code>cargo test --lib</code>: <strong>212 passing</strong> (up from 166 at plan start).</li>
+<li><code>cargo test --lib gf180mcu</code>: <strong>45 passing</strong> (combinational + sequential
+equivalence + classification + detection + AIG-build).</li>
+<li><code>cargo test -p opensta-to-ir multi_corner</code>: <strong>2 passing</strong> (sky130 +
+gf180mcu), each gated on its respective volare PDK install.</li>
+</ul>
+<h2 id="follow-on-cleanup"><a class="header" href="#follow-on-cleanup">Follow-on cleanup</a></h2>
+<p>These are nice-to-have refactors flagged during the GF180MCU work
+but deliberately out of scope for the enablement effort itself:</p>
+<ol>
+<li>
+<p><strong><code>build.rs</code> pin-table generator for SKY130 too.</strong> <code>build.rs:: generate_gf180mcu_pin_table</code> is a new precedent — scan +
+parse + cross-assert. SKY130 still uses hand-rolled match arms
+in <code>src/sky130.rs</code>. Porting SKY130 to the same mechanism would
+remove ~200 LOC of mechanically-maintained tables.</p>
+</li>
+<li>
+<p><strong>Physical relocation of shared PDK decomp infrastructure</strong> out
+of <code>sky130_pdk.rs</code> into <code>pdk_decomp.rs</code>. Phase 4 satisfied this
+via re-exports + visibility bumps to <code>pub(crate)</code>; the real move
+is deferred until a third PDK exercises the API surface.</p>
+</li>
+<li>
+<p><strong><code>CellLibrary</code> enum location.</strong> Currently lives in <code>src/sky130.rs</code>
+even though it represents all PDKs. Moving to a neutral home
+(<code>src/pdk.rs</code> or <code>src/lib.rs</code>) is a trivial mechanical refactor.</p>
+</li>
+<li>
+<p><strong>IO and PR libraries.</strong> <code>gf180mcu_fd_io</code> (pads, levelshifters)
+and <code>gf180mcu_fd_pr</code> (primitives — diodes, R/C, antenna cells)
+appear in real post-P&amp;R netlists. Treated like <code>tap</code>/<code>fill</code>/<code>decap</code>
+today (recognised but stubbed); will need richer modelling when
+wafer.space test-run-1 designs arrive (Phase 7).</p>
+</li>
+<li>
+<p><strong>CI install strategy for GF180MCU Liberty.</strong> Both the sky130 and
+gf180mcu multi-corner tests currently skip when the PDK isn't
+installed locally. CI integration (volare-on-CI or a vendored
+minimal Liberty subset) is the same blocker that gates the
+<code>inv_chain_pnr</code> sky130 corpus entry — out of scope for the GF180
+enablement effort itself.</p>
+</li>
+</ol>
+<h2 id="pitfalls-pdk-specific-for-future-readers"><a class="header" href="#pitfalls-pdk-specific-for-future-readers">Pitfalls (PDK-specific, for future readers)</a></h2>
+<ul>
+<li><strong>Reset polarity</strong> — GF180MCU is active-low (<code>RN</code>/<code>SETN</code>); same
+AIG formula as SKY130's <code>RESET_B</code>/<code>SET_B</code>.</li>
+<li><strong>Negative-edge clocks</strong> — cells like <code>dffnq</code>/<code>dffnrnq</code>/<code>icgtn</code>
+use pin name <code>CLKN</code> instead of <code>CLK</code>. The "n" prefix is a clock
+marker, not a reset-polarity marker.</li>
+<li><strong>Power pins</strong> — GF180MCU operates at 5V nominal (vs SKY130's
+1.8V). Both follow VDD/VSS naming. Corner names follow
+<code>tt_025C_5v00</code> shape and parse cleanly through the generic
+<code>TimingLibrary</code> loader.</li>
+<li><strong>Cell pin names differ from SKY130</strong> — inverter is <code>I</code>/<code>ZN</code>
+(not <code>A</code>/<code>Y</code>); DFF is <code>CLK</code>/<code>D</code>/<code>Q</code>/<code>notifier</code>. The <code>notifier</code>
+port wires the UDP delay-model wrapper but is unused for logic
+simulation.</li>
+<li><strong>Cell-name collisions</strong> between 7t5v0 and 9t5v0 — both have
+<code>nand2_1</code> etc. Detection keys on the full prefix, not the base
+type. Auto-handled by <code>is_gf180mcu_cell</code>.</li>
+<li><strong>Drive-strength suffixes</strong> — GF180MCU uses integer multipliers
+(<code>inv_1</code>, <code>inv_2</code>, <code>inv_4</code>, …) matching the SKY130 convention.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>docs/adding-a-pdk.md</code> — canonical PDK integration recipe.</li>
+<li><code>src/sky130.rs</code>, <code>src/sky130_pdk.rs</code> — SKY130 reference
+implementation.</li>
+<li><code>src/gf180mcu.rs</code>, <code>src/gf180mcu_pdk.rs</code> — GF180MCU
+implementation.</li>
+<li><code>crates/opensta-to-ir/tests/opensta_integration.rs::{sky130,gf180mcu}_multi_corner_emits_per_corner_values</code>
+— timing-side validation.</li>
+<li><code>tests/timing_test/{sky130,gf180mcu}_timing/</code> — synthetic
+fixtures.</li>
+<li><code>pyproject.toml::[tool.jacquard.pdks.{sky130,gf180mcu}]</code> —
+install pins.</li>
+<li>Upstream PDK: https://github.com/google/gf180mcu-pdk</li>
+<li>wafer.space variant: https://github.com/wafer-space/gf180mcu</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/post-phase-0-roadmap.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/phase-0-ir-and-oracle.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/post-phase-0-roadmap.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/phase-0-ir-and-oracle.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

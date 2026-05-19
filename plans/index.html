@@ -1,0 +1,260 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Implementation Plans - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="implementation-plans"><a class="header" href="#implementation-plans">Implementation Plans</a></h1>
+<p>Phased implementation plans with entry and exit criteria. Plans live
+here when the work spans multiple commits and needs an explicit
+scheduling artefact; once shipped, the plan is kept as a historical
+record (Status flipped to <em>Implemented</em>) rather than deleted, so the
+phasing is recoverable later.</p>
+<p>For short-lived working memory between sessions, see
+<a href="../handoff-discipline.html"><code>../handoff-discipline.md</code></a> — that lives
+in <code>docs/handoffs/</code> and is deliberately kept separate from the
+persistent plans here.</p>
+<h2 id="status-legend"><a class="header" href="#status-legend">Status legend</a></h2>
+<ul>
+<li><strong>Active</strong> — currently being worked on or scheduled.</li>
+<li><strong>Implemented</strong> — shipped; kept as historical record.</li>
+<li><strong>Deferred</strong> — captured for future work; not currently scheduled.</li>
+<li><strong>Exploratory</strong> — architectural thinking captured ahead of demand.</li>
+</ul>
+<h2 id="index"><a class="header" href="#index">Index</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Plan</th><th>Status</th></tr></thead><tbody>
+<tr><td><a href="post-phase-0-roadmap.html">Post-Phase-0 Roadmap</a></td><td>Active — scheduling doc for ADRs 0007 and 0008</td></tr>
+<tr><td><a href="gf180mcu-enablement.html">GF180MCU PDK enablement</a></td><td>Mostly implemented — Phases 0–6 shipped; Phase 7 deferred</td></tr>
+<tr><td><a href="phase-0-ir-and-oracle.html">Phase 0: Timing IR and OpenSTA oracle</a></td><td>Implemented — historical record</td></tr>
+<tr><td><a href="ws2-opensta-to-ir.html">WS2: <code>opensta-to-ir</code></a></td><td>Implemented — historical record</td></tr>
+<tr><td><a href="ws3-delete-sdf-parser.html">WS3: delete SDF parser + interim runtime hook</a></td><td>Implemented — historical record (see ADR 0006 Amendment)</td></tr>
+<tr><td><a href="ws3-cosim-sdf-followup.html">WS3 follow-up: re-add cosim <code>--sdf</code> via <code>opensta-to-ir</code></a></td><td>Deferred</td></tr>
+<tr><td><a href="multi-clock-and-stimulus-architecture.html">Multi-clock and stimulus architecture</a></td><td>Exploratory — demand-driven</td></tr>
+</tbody></table>
+</div>
+<h2 id="reading-order-for-new-contributors"><a class="header" href="#reading-order-for-new-contributors">Reading order for new contributors</a></h2>
+<p>If you want to understand how the timing stack got to where it is:</p>
+<ol>
+<li><a href="phase-0-ir-and-oracle.html"><code>phase-0-ir-and-oracle.md</code></a> — the
+umbrella plan, with the five work streams (WS1–WS5).</li>
+<li><a href="ws2-opensta-to-ir.html"><code>ws2-opensta-to-ir.md</code></a> and
+<a href="ws3-delete-sdf-parser.html"><code>ws3-delete-sdf-parser.md</code></a> — the
+per-work-stream detail for the IR producer and the SDF parser
+removal.</li>
+<li><a href="post-phase-0-roadmap.html"><code>post-phase-0-roadmap.md</code></a> — what comes
+next, sequenced against the ADRs.</li>
+</ol>
+<h2 id="adding-a-new-plan"><a class="header" href="#adding-a-new-plan">Adding a new plan</a></h2>
+<ol>
+<li>Filename: short kebab-case (<code>&lt;topic&gt;.md</code> or
+<code>&lt;ws-or-phase&gt;-&lt;topic&gt;.md</code>).</li>
+<li>Start with <code># Plan — &lt;title&gt;</code> and a <code>**Status:**</code> line.</li>
+<li>Where the plan executes a specific ADR or work stream, name them
+in a <code>**Predecessors:**</code> / <code>**ADRs:**</code> block near the top so the
+dependency graph is explicit.</li>
+<li>Add the row to the table above. When the plan ships, change the
+status in the file and here in the same commit.</li>
+</ol>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../adr/0008-structured-timing-output.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/post-phase-0-roadmap.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../adr/0008-structured-timing-output.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/post-phase-0-roadmap.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

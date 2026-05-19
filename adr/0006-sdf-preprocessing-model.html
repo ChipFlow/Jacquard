@@ -1,0 +1,285 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>0006 — SDF preprocessing model - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="adr-0006--sdf-preprocessing-model-and-interim-to-release-cutover"><a class="header" href="#adr-0006--sdf-preprocessing-model-and-interim-to-release-cutover">ADR 0006 — SDF preprocessing model and interim-to-release cutover</a></h1>
+<p><strong>Status:</strong> Accepted 2026-04; amended 2026-05-02 (see § Amendment).</p>
+<h2 id="amendment-2026-05-02"><a class="header" href="#amendment-2026-05-02">Amendment (2026-05-02)</a></h2>
+<p>The original Decision treated subprocess invocation of OpenSTA from the shipped Jacquard runtime as license-incompatible, requiring Phase 3 (native Rust SDF→IR converter) to land before first release. On review of GPL-3 § 5 ("aggregate") and the FSF interpretation of subprocess/IPC boundaries, this restriction is more conservative than necessary. The relevant facts:</p>
+<ul>
+<li>The interface is arms-length: standard EDA interchange formats (Liberty / Verilog / SDF / SPEF / SDC) in, our own IR JSON (ADR 0002) out. No shared data structures, no headers, no linking.</li>
+<li>We do not bundle OpenSTA in any Jacquard distribution. The user installs OpenSTA themselves; user-side combination of separately-distributed programs is not "distribution of a combined work" under GPL-3.</li>
+<li>The original "no runtime subprocess" rule was effectively a commercial-perception buffer, not a strict licensing requirement.</li>
+</ul>
+<p><strong>Revised bright lines</strong> (these supersede the original "Shipped release" sub-section):</p>
+<ol>
+<li><strong>No linking</strong> of GPL code into the Jacquard binary. Unchanged.</li>
+<li><strong>No bundling</strong> of OpenSTA (or any GPL tool) in Jacquard distribution artefacts (release tarballs, Homebrew formulae, Docker images that ship as Jacquard releases). If a packager wants to bundle, they take on GPL distribution obligations themselves.</li>
+<li><strong>Subprocess invocation of user-installed OpenSTA from the shipped runtime is permitted.</strong> <code>jacquard sim input.sdf</code> may keep its <code>opensta-to-ir</code> subprocess hook in shipped releases, provided OpenSTA is discovered on PATH rather than bundled.</li>
+</ol>
+<p><strong>Phase 3 reclassification.</strong> Native Rust SDF→IR converter is no longer release-gating. It remains a goal — for ergonomics (no OpenSTA install required) and for downstream commercial integrators whose legal teams treat any GPL touchpoint as risk — but ships when bandwidth allows, not as a release blocker. Roadmap consequences are tracked in <code>../plans/post-phase-0-roadmap.md</code> § Phase 3.</p>
+<p><strong>Corequisite — OpenSTA detection and version check (release-blocking).</strong> Relaxing the no-runtime-subprocess rule is conditional on the shipped runtime giving users a meaningful error when OpenSTA is missing or out-of-date. Today (<code>src/sim/setup.rs:248-264</code>), missing OpenSTA only emits a <code>warn!</code> and the simulation proceeds with no timing data loaded — acceptable during development, ships as a UX bug. Concretely, before first release we must:</p>
+<ol>
+<li>Hard-fail (not warn) when <code>--sdf</code> is requested and OpenSTA cannot be located.</li>
+<li>Probe OpenSTA's version on first invocation and fail with a remediation message if it is older than the version pinned in <code>vendor/opensta/</code> (per ADR 0005).</li>
+<li>Warn-but-proceed if the detected version is newer than the latest tested version, naming the version in the warning.</li>
+<li>Document the OpenSTA dependency in <code>docs/usage.md</code>.</li>
+</ol>
+<p>Tracked as <strong>WS-RH.1</strong> in <code>../plans/post-phase-0-roadmap.md</code> § Release hardening.</p>
+<p><strong>Code-comment cleanup follow-up.</strong> The <code>INTERIM per ADR 0006</code> / <code>Pre-release only</code> tags in <code>src/sim/setup.rs</code> (lines ~176, ~228, ~286) and <code>src/bin/jacquard.rs</code> (~187) describe a premise that no longer applies. Folded into WS-RH.1 (<code>../plans/post-phase-0-roadmap.md</code> § Release hardening) rather than spun out as a separate cleanup commit.</p>
+<p>The original Context, Decision (Phase 0 + Phase 3), and Walk-back sections below are retained for historical record. Where they conflict with the bright lines above, the bright lines win.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Jacquard's hand-rolled SDF parser (<code>src/sdf_parser.rs</code>) has accumulated reactive maintenance over time — empty <code>()</code> delays, <code>(COND …)</code> pin specs, escape handling, edge-qualified timing checks, TIMINGCHECK-stripping workarounds for OpenLane2 output. Each production failure has been a one-off patch. The timing-correctness review flagged this as issue #3, and a native Rust grammar-based replacement is the Phase 3 deliverable.</p>
+<p>Concurrently, ADR 0001 establishes OpenSTA as the timing correctness oracle (subprocess, never linked, GPL), and ADR 0002 introduces a timing IR that decouples parsing from consumption.</p>
+<p>Two facts together shape the decision:</p>
+<ol>
+<li><strong>No release pressure.</strong> Release can happen after Phase 3 lands. We are not forced to keep the hand-rolled parser alive while waiting on Phase 3.</li>
+<li><strong>Permissive-license constraint applies to the shipped binary.</strong> Subprocess invocation of GPL tooling is acceptable — does not trigger reciprocal obligations — and during pre-release development, even in-runtime subprocess invocation does not violate the constraint because no runtime binary is being distributed.</li>
+</ol>
+<p>Given these, maintaining the hand-rolled parser through Phase 0–2 is unnecessary. OpenSTA's mature dialect coverage can substitute, via subprocess, while we build toward a native Rust replacement at our own pace.</p>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<h3 id="phase-0"><a class="header" href="#phase-0">Phase 0</a></h3>
+<ul>
+<li><strong>Delete <code>src/sdf_parser.rs</code></strong> and the SDF→Jacquard-internal-types code path. All paths that previously consumed SDF now consume timing IR.</li>
+<li><strong>Ship <code>opensta-to-ir</code></strong> as a standalone preprocessing tool that consumes Liberty + Verilog + SDF + SPEF + SDC and emits timing IR. Subprocess-based on OpenSTA. Production-quality: stable CLI, documented exit codes, clear diagnostics.</li>
+<li><strong>Canonical runtime path</strong> is <code>jacquard sim --timing-ir &lt;path&gt;</code>, consuming pre-converted IR. This path works without OpenSTA on the user's machine — pre-converted IR is sufficient.</li>
+<li><strong>Interim ergonomic path</strong>: during development (pre-release only), <code>jacquard sim input.sdf</code> subprocesses <code>opensta-to-ir</code> internally to produce IR on the fly. This is a contributor convenience, not a shipping feature. Flag exists in code as <code>pre-release only</code> with a clear comment tying back to this ADR.</li>
+</ul>
+<h3 id="phase-3"><a class="header" href="#phase-3">Phase 3</a></h3>
+<ul>
+<li><strong>Native Rust SDF→IR converter</strong> replaces the OpenSTA subprocess call inside <code>jacquard sim input.sdf</code>. Grammar-based (nom / pest), validated against OpenSTA on the corpus per ADR 0001.</li>
+<li>Lands <strong>before first release</strong>.</li>
+</ul>
+<h3 id="shipped-release"><a class="header" href="#shipped-release">Shipped release</a></h3>
+<ul>
+<li><strong>No OpenSTA invocation from the <code>jacquard</code> runtime binary.</strong> The native Rust converter handles SDF inputs directly.</li>
+<li><strong><code>opensta-to-ir</code> remains</strong> as an alternative preprocessing tool. Users who want OpenSTA-computed timing may use it; subprocess model preserves permissive licensing.</li>
+</ul>
+<h3 id="walk-back-options-if-assumptions-change"><a class="header" href="#walk-back-options-if-assumptions-change">Walk-back options (if assumptions change)</a></h3>
+<ul>
+<li><strong>If OpenSTA dialect coverage proves insufficient</strong> during Phase 0 — e.g., a current Jacquard-supported SDF fails to parse — add dialect shims to <code>opensta-to-ir</code>'s post-processing. Reinstating the hand-rolled parser is the last resort, not the first.</li>
+<li><strong>If the Phase 3 Rust rewrite stalls</strong> — ship the first release with preprocessing-only (no <code>jacquard sim input.sdf</code> path), remove the interim subprocess, and land the native converter in a later release. No information lost; users preprocess manually. This is already the post-release shape for <code>opensta-to-ir</code>; it's only the <code>jacquard sim input.sdf</code> convenience that would be deferred.</li>
+<li><strong>If OpenSTA becomes unmaintainable or disappears</strong> — the submodule pin (ADR 0005) remains authoritative for the integrated version. A forked submodule can maintain any necessary patches.</li>
+</ul>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<ul>
+<li>Jacquard's repository stops carrying a hand-rolled SDF parser as a reactive-maintenance target. Bugs in SDF interpretation between Phase 0 and Phase 3 are OpenSTA's problem (upstream) or <code>opensta-to-ir</code> post-processing's problem, not Jacquard's core codebase's problem.</li>
+<li>Pre-release ergonomic one-step workflow for contributors is preserved.</li>
+<li>Contributors running Jacquard on a <em>new</em> design (no pre-converted IR) must have OpenSTA installed during Phase 0 through Phase 3. For existing primary-corpus designs, pre-converted IR is checked in; no OpenSTA needed.</li>
+<li>Release-time check is unambiguous: either the runtime subprocess is replaced by native code, or it is removed entirely. Both outcomes satisfy the permissive-licensing constraint for the shipped binary.</li>
+<li>Test corpus regenerable: if OpenSTA updates change IR output, golden files are regenerated deliberately (reviewable diff), not silently.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>../project-scope.md</code> — licensing constraint, preprocessing-tools pattern.</li>
+<li><code>../timing-correctness.md</code> — P1 (oracle), R1 (IR).</li>
+<li>ADR 0001 — OpenSTA as oracle (subprocess model).</li>
+<li>ADR 0002 — timing IR (format consumed).</li>
+<li>ADR 0005 — OpenSTA vendoring (submodule for reproducibility + stress corpus).</li>
+<li><code>../plans/phase-0-ir-and-oracle.md</code> — WS2 productionisation, WS3 deletion + interim hook.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../adr/0005-opensta-vendoring-and-corpus.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../adr/0007-timing-model-fidelity-roadmap.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../adr/0005-opensta-vendoring-and-corpus.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../adr/0007-timing-model-fidelity-roadmap.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

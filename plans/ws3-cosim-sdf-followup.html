@@ -1,0 +1,386 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>WS3 follow-up: cosim --sdf - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="plan--ws3-follow-up-re-add-cosim---sdf-via-opensta-to-ir"><a class="header" href="#plan--ws3-follow-up-re-add-cosim---sdf-via-opensta-to-ir">Plan — WS3 follow-up: re-add cosim <code>--sdf</code> via <code>opensta-to-ir</code></a></h1>
+<p><strong>Status:</strong> Deferred. Tracked here so future work can pick it up.
+<strong>Predecessor:</strong> WS3 phase 3.4 (deletes hand-rolled <code>src/sdf_parser.rs</code>).</p>
+<h2 id="background"><a class="header" href="#background">Background</a></h2>
+<p>Phase 3.4 deleted <code>src/sdf_parser.rs</code>. The <code>jacquard sim</code> subcommand kept
+SDF input working (Phase 3.3 wired <code>--sdf</code> through
+<code>setup::load_sdf_via_opensta_to_ir</code>, an internal subprocess wrapper that
+calls the <code>opensta-to-ir</code> crate to convert SDF→IR). The <code>jacquard cosim</code>
+subcommand chose <strong>Option B</strong> of the phase 3.4 handoff: drop <code>--sdf</code>
+entirely rather than thread <code>--liberty</code> through. As a result, cosim now
+only accepts pre-converted IR via <code>--timing-ir</code>.</p>
+<h2 id="what-was-removed-in-34"><a class="header" href="#what-was-removed-in-34">What was removed in 3.4</a></h2>
+<ul>
+<li><code>CosimArgs::sdf</code>, <code>sdf_corner</code>, <code>sdf_debug</code> CLI fields
+(<code>src/bin/jacquard.rs</code>).</li>
+<li>The <code>config.timing.sdf_file</code> / <code>sdf_corner</code> fallback path in
+<code>src/sim/cosim_metal.rs::run_cosim</code>.</li>
+<li><code>TimingSimConfig::sdf_file</code> and <code>sdf_corner</code> JSON fields
+(<code>src/testbench.rs</code>).</li>
+</ul>
+<h2 id="user-facing-migration-current-state"><a class="header" href="#user-facing-migration-current-state">User-facing migration (current state)</a></h2>
+<p>The <code>tests/mcu_soc/</code> cosim flow that used to load SDF via the testbench
+config now needs an explicit pre-conversion step.</p>
+<h3 id="feed-6_finalv-directly-to-opensta-to-ir"><a class="header" href="#feed-6_finalv-directly-to-opensta-to-ir">Feed <code>6_final.v</code> directly to <code>opensta-to-ir</code></a></h3>
+<p><strong>Retraction (2026-05-18).</strong> Earlier versions of this section
+recommended feeding <code>tests/mcu_soc/data/top_synth.v</code> (post-synthesis,
+pre-P&amp;R) to <code>opensta-to-ir</code> to dodge a parse error on <code>6_final.v</code>'s
+chipflow integration wrapper. That was wrong: <code>top_synth.v</code> is
+missing the ~236K cells P&amp;R inserts (<code>clkbuf_regs_*</code> CTS buffers,
+<code>ANTENNA_*</code> diodes, <code>delaybuf_*</code>, fillers), so OpenSTA silently drops
+every SDF entry referencing a P&amp;R-inserted cell and the resulting IR
+is missing the bulk of the design's timing. The "28162 matched /
+2090 unmatched" verification log we celebrated at the time measured
+jtir records against the cosim-loaded netlist, not SDF coverage
+against the jtir — high surface match rate, materially incomplete
+IR. See <strong>ADR 0009</strong> (OpenSTA Verilog reader input constraints) for
+the broader rule.</p>
+<p><code>opensta-to-ir</code> now transparently extracts <code>module &lt;--top&gt;</code> from each
+input file before invoking OpenSTA (implementation in
+<code>crates/opensta-to-ir/src/verilog_filter.rs</code>). For the chipflow
+mcu_soc case this strips the <code>openframe_project_wrapper</code> module
+automatically; the same handling kicks in for any LibreLane +
+wafer.space user (hazard3 and future tapeouts) whose final netlist
+carries an integration wrapper around the structural top.</p>
+<pre><code class="language-sh"># Convert SDF → IR once. Pass 6_final.v directly; the wrapper module
+# is dropped automatically.
+opensta-to-ir \
+    --liberty /path/to/sky130_fd_sc_hd__tt_025C_1v80.lib \
+    --verilog tests/mcu_soc/data/6_final.v \
+    --sdf tests/mcu_soc/data/6_final.sdf \
+    --top top \
+    --output tests/mcu_soc/data/6_final.jtir
+
+# Run cosim with the pre-converted IR. Cosim loads 6_final.v (the
+# wrapper) because that's what carries GPIO ports. The IR consumer's
+# hierarchy-prefix detection strips the `top_inst/` prefix from the
+# wrapper's cell paths so they match the IR's instance names.
+cargo run -r --features metal --bin jacquard -- cosim \
+    tests/mcu_soc/data/6_final.v \
+    --config tests/mcu_soc/sim_config_sky130.json \
+    --top-module openframe_project_wrapper \
+    --timing-ir tests/mcu_soc/data/6_final.jtir
+</code></pre>
+<p><code>tests/mcu_soc/sim_config_sky130.json</code> no longer carries <code>sdf_file</code> /
+<code>sdf_corner</code> (the fields would be silently ignored if added back;
+cosim does not consume them).</p>
+<h2 id="events-reference-comparison-nuances"><a class="header" href="#events-reference-comparison-nuances">Events-reference comparison: nuances</a></h2>
+<p><code>tests/mcu_soc/events_reference.json</code> was wired into the sky130 cosim
+config as part of phase 3.4 verification. End-to-end pipeline result
+on a 3M-tick run:</p>
+<ul>
+<li>67 UART bytes captured; the reference's 155 UART events end at
+timestamp 4,187,182. All 67 captured payloads match the reference's
+leading bytes (decoded UART output: <code>....: nyaa~!\nSoC type: CA7F100F\nFlash ID: CA7CA7FF\nQuad mode</code>). No payload divergence.</li>
+<li>15 non-UART entries in the reference (cxxrtl-emitted SPI <code>deselect</code>
+events with <code>payload: ""</code>) are filtered out at parse time by the
+tolerant deserializer in <code>cosim_metal.rs::run_cosim</code>. Without that
+filter the comparison panicked on the first SPI entry.</li>
+</ul>
+<h3 id="chipflows-num_steps-and-timestamp-are-edge-counted"><a class="header" href="#chipflows-num_steps-and-timestamp-are-edge-counted">chipflow's <code>num_steps</code> and <code>timestamp</code> are edge-counted</a></h3>
+<p><strong>Retraction.</strong> Earlier drafts of this section claimed Jacquard's
+<code>--max-cycles</code> counts half-cycles. That was a misdiagnosis based on
+reading <code>MultiClockScheduler::new</code> (which does emit per-edge raw
+entries) without noticing the pairing layer at
+<code>src/sim/cosim_metal.rs:2604-2675</code> that collapses them into one
+paired buffer per cycle. Today, <strong><code>--max-cycles N</code> correctly counts
+N full clock cycles</strong>: each cosim tick does one fall-edge dispatch
+plus one rise-edge dispatch and DFFs capture once per tick. Verified
+via <code>--stimulus-vcd</code> trace (5 ticks → simulated time spans 0–200000
+ps for a 40 ns period clock, exactly 5 cycles).</p>
+<p>The actual unit difference vs chipflow's cxxrtl harness:</p>
+<ul>
+<li>chipflow's <code>num_steps</code> is the count of <code>tick()</code> calls; each <code>tick()</code>
+bumps <code>++timestamp</code> twice (once after the negedge dispatch, once
+after the posedge), so the <code>events_reference.json</code> <code>timestamp</code>
+field counts <strong>clock edges</strong> (a full cycle = posedge-to-posedge =
+2 edges). The harness:
+<pre><code class="language-cpp">auto tick = [&amp;]() {
+    {{interface}}.step(timestamp);
+    top.clk.set(false); agent.step(); ++timestamp;  // post-negedge (odd)
+    top.clk.set(true);  agent.step(); ++timestamp;  // post-posedge (even)
+};
+for (int i = 0; i &lt; num_steps; i++) tick();
+</code></pre>
+See <code>chipflow-lib/chipflow/common/sim/main.cc.jinja:32-74</code>.</li>
+<li>The half-tick timestamp is an <strong>intentional design</strong>, not a bug:
+parity tags each event with the clock phase it fired on (useful for
+verification of async paths).</li>
+<li>chipflow's <code>num_steps</code> therefore doubles as an edge budget: 3 M
+num_steps = 3 M edges = 1.5 M full clock cycles.</li>
+</ul>
+<p>To compare a Jacquard cosim run against today's <code>events_reference.json</code>,
+divide reference timestamps by 2 to convert edges → cycles. Empirical
+spot-check on mcu_soc/sky130: byte-0 in Jacquard at <code>--max-cycles 200000</code> arrives at tick 28682; reference timestamp 58290 / 2 = 29145
+cycles; ratio 0.984× (simulators agree on simulated time within 2%).</p>
+<p>The earlier "67 of 155 events captured" gap is <strong>not</strong> a budget
+issue — chipflow drives input stimulus via <code>design/tests/input.json</code>
+and reference events 69+ require those driven inputs. The input-stimulus
+dispatcher was added in commit <code>4a1a989</code>, and the mcu_soc/sky130 cosim
+now matches the cut-down chipflow reference 1:1 (90/90 events).</p>
+<p>The earlier "Jacquard ~14% slower per byte than cxxrtl" claim relied
+on a phantom half-cycle correction; it is also retracted. There is
+no rate gap to explain at this level.</p>
+<h3 id="done---max-cycles-renamed-to---max-clock-edges-commit-46b5c28"><a class="header" href="#done---max-cycles-renamed-to---max-clock-edges-commit-46b5c28">Done: <code>--max-cycles</code> renamed to <code>--max-clock-edges</code> (commit <code>46b5c28</code>)</a></h3>
+<p>Cosim's internal granularity moved from full clock cycles to scheduler
+edges, aligning Jacquard's CLI 1:1 with chipflow's <code>num_steps</code> and
+unlocking per-edge event timestamping. Section retained for context on
+the unit conventions captured above.</p>
+<h2 id="option-a--restore-cosim---sdf-ergonomics"><a class="header" href="#option-a--restore-cosim---sdf-ergonomics">Option A — restore cosim <code>--sdf</code> ergonomics</a></h2>
+<p>When this becomes a priority, mirror the <code>jacquard sim</code> surface:</p>
+<h3 id="changes"><a class="header" href="#changes">Changes</a></h3>
+<ol>
+<li><strong>Add <code>--liberty</code> to <code>CosimArgs</code></strong> (<code>src/bin/jacquard.rs</code>). Plumb it
+through <code>DesignArgs::liberty</code> (currently hardcoded <code>None</code> in
+<code>cmd_cosim</code>). Also passthrough <code>--top-module</code> if not already.</li>
+<li><strong>Add <code>--sdf</code>, <code>--sdf-corner</code>, <code>--sdf-debug</code> back to <code>CosimArgs</code></strong>.
+Make them mutually exclusive with <code>--timing-ir</code> (clap
+<code>conflicts_with = "timing_ir"</code>).</li>
+<li><strong>Re-add <code>TimingSimConfig::sdf_file</code> / <code>sdf_corner</code> (optional)</strong> —
+plus a new <code>liberty_file</code> field for the OpenSTA invocation. Update
+<code>tests/mcu_soc/sim_config_sky130.json</code> to use the new shape.</li>
+<li><strong>Restore the cosim config-file fallback</strong>: in
+<code>src/sim/cosim_metal.rs::run_cosim</code>, when timing is not yet enabled
+and the config provides SDF + Liberty paths, call
+<code>setup::load_sdf_via_opensta_to_ir</code>. Match the priority order:
+CLI &gt; config.timing.* &gt; nothing.</li>
+<li><strong>Update <code>--timing-vcd</code> error message</strong> to mention <code>--sdf</code> again.</li>
+</ol>
+<h3 id="out-of-scope-for-option-a"><a class="header" href="#out-of-scope-for-option-a">Out of scope for Option A</a></h3>
+<ul>
+<li>Rebuilding a hand-rolled SDF parser. (See ADR 0006 — the durable
+replacement is the native Rust SDF→IR converter, tracked separately as
+Phase 3 in the original phasing.)</li>
+<li>Adding cosim-specific corner-selection beyond what <code>jacquard sim</code>
+already offers. The IR's <code>min/typ/max</code> triple is selected via
+<code>ir_corner0_max</code> (currently always <code>max</code>); changing that is a separate
+concern that affects both subcommands.</li>
+</ul>
+<h2 id="verification"><a class="header" href="#verification">Verification</a></h2>
+<p>After Option A lands:</p>
+<pre><code class="language-sh">cargo build --features metal
+cargo test --lib
+# Manual smoke test of the previous mcu_soc workflow:
+cargo run -r --features metal --bin jacquard -- cosim \
+    tests/mcu_soc/data/6_final.v \
+    --config tests/mcu_soc/sim_config_sky130.json \
+    --liberty &lt;path&gt;/sky130.lib \
+    --sdf tests/mcu_soc/data/6_final.sdf
+</code></pre>
+<p>Should produce equivalent results to the pre-3.4 hand-rolled-parser
+path within the IR's representational bounds (single-value
+interconnect delays, <code>max</code> corner selection).</p>
+<h2 id="walk-back"><a class="header" href="#walk-back">Walk-back</a></h2>
+<p>If Option A is never picked up before first release, the existing IR-only
+cosim surface is fine — contributors using SDF can pre-convert via
+<code>opensta-to-ir</code> and pass the resulting <code>.jtir</code>. The follow-up exists as a
+contributor-ergonomics improvement, not a correctness gap.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/ws3-delete-sdf-parser.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/multi-clock-and-stimulus-architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/ws3-delete-sdf-parser.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/multi-clock-and-stimulus-architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Phase 0: Timing IR and OpenSTA oracle - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="plan--phase-0-timing-ir-and-opensta-oracle"><a class="header" href="#plan--phase-0-timing-ir-and-opensta-oracle">Plan — Phase 0: Timing IR and OpenSTA oracle</a></h1>
+<p><strong>Status:</strong> Implemented — historical record. All five work streams
+(WS1 schema, WS2 <code>opensta-to-ir</code> producer, WS3 SDF parser deletion +
+interim runtime hook, WS4 diff harness + CI, WS5 parser-success
+assertions) shipped through 2026-05-02. All eight exit criteria are
+met. Ongoing scheduling for timing-model fidelity work has moved to
+<code>post-phase-0-roadmap.md</code>. The per-WS detail and embedded status
+markers below are preserved for the implementation record.</p>
+<h2 id="goal"><a class="header" href="#goal">Goal</a></h2>
+<p>Deliver the minimum viable infrastructure to enforce Jacquard's timing correctness contract:</p>
+<ol>
+<li>A stable timing intermediate representation (IR) for SDF-equivalent annotations.</li>
+<li>An OpenSTA-driven subprocess converter that produces IR from the same inputs Jacquard consumes.</li>
+<li>A converter that produces IR from Jacquard's existing SDF parser output.</li>
+<li>A CI diff harness that fails loud on converter disagreement.</li>
+<li>Parser-success assertions on the SDF and Liberty paths.</li>
+</ol>
+<p>After phase 0, Jacquard's timing pipeline has an enforced external reference. Silent failures (zero-match SDF, mis-scoped hierarchical prefixes, unexpected cell drops) surface as CI failures rather than correctness regressions detected in the field.</p>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<ul>
+<li>Requirements doc (<code>../timing-correctness.md</code>) accepted.</li>
+<li>ADR 0001 (OpenSTA oracle) accepted.</li>
+<li>ADR 0002 (timing IR) accepted.</li>
+<li>A representative test design committed to the repo with inputs needed for both Jacquard and OpenSTA (<code>.v</code> + <code>.lib</code> + <code>.sdf</code> minimum; <code>.spef</code> if available). Candidate: <code>tests/timing_test/inv_chain_pnr</code> or the MCU SoC subset, whichever is smaller for first-pass iteration.</li>
+<li>OpenSTA available on developer machines and CI runners (installation documented).</li>
+</ul>
+<h2 id="work-breakdown"><a class="header" href="#work-breakdown">Work breakdown</a></h2>
+<h3 id="ws1--ir-schema"><a class="header" href="#ws1--ir-schema">WS1 — IR schema</a></h3>
+<blockquote>
+<p><strong>Done.</strong> Shipped as the <code>timing-ir</code> crate (<code>508baaf</code> initial,
+<code>2432d41</code> simplification). Schema at
+<code>crates/timing-ir/schemas/timing_ir.fbs</code>; per-DFF <code>CLOCK_ARRIVAL</code>
+records added later in <code>c403cc8</code> (Pillar B Stage 1, beyond original
+WS1 scope). JSON round-trip verified via <code>crates/timing-ir/tests/</code>.</p>
+</blockquote>
+<p>Produce the FlatBuffers schema (<code>schemas/timing_ir.fbs</code>) and generated Rust bindings.</p>
+<p>Fields (minimum viable; extend only with written justification):</p>
+<ul>
+<li><code>SchemaVersion { major, minor, patch }</code>.</li>
+<li><code>Corner { name, process, voltage, temperature }</code>; IR holds a list of corners.</li>
+<li><code>CornerValue { corner_index, min, typ, max }</code> for multi-corner floats.</li>
+<li><code>TimingArc { driver_pin, load_pin, rise_delay: [CornerValue], fall_delay: [CornerValue], condition, provenance }</code>.</li>
+<li><code>InterconnectDelay { net, from_pin, to_pin, delay: [CornerValue], provenance }</code>.</li>
+<li><code>SetupHoldCheck { d_pin, clk_pin, edge, setup: [CornerValue], hold: [CornerValue], condition, provenance }</code>.</li>
+<li><code>Provenance { source_tool, source_file, origin: Asserted | Computed | Defaulted }</code>.</li>
+<li><code>VendorExtension { source_tool, kind: CadenceX | SynopsysY | Other, raw_bytes }</code> — untyped passthrough for unrecognised annotations.</li>
+<li>Root table <code>TimingIR { schema_version, corners, cell_instances, timing_arcs, interconnect_delays, setup_hold_checks, vendor_extensions }</code>.</li>
+</ul>
+<p>Deliverables:</p>
+<ul>
+<li><code>schemas/timing_ir.fbs</code> checked in.</li>
+<li><code>build.rs</code> integration for code generation (or checked-in generated Rust with a <code>flatc</code> pin).</li>
+<li>A tiny <code>timing-ir</code> crate exposing read/write helpers.</li>
+<li>JSON round-trip via <code>flatc --json</code> verified in a unit test.</li>
+</ul>
+<p>Scope guard: if you find yourself adding fields that represent computed timing graphs, cell electrical characterisation, or netlist structure, stop and re-read ADR 0002.</p>
+<h3 id="ws2--opensta-to-ir-production-tool"><a class="header" href="#ws2--opensta-to-ir-production-tool">WS2 — <code>opensta-to-ir</code> production tool</a></h3>
+<p>Per ADR 0006, <code>opensta-to-ir</code> is a shipped preprocessing tool, not merely a validation helper. Post-release it remains as an alternative preprocessing path for users who want OpenSTA-computed timing.</p>
+<p>Detailed design and phased implementation: <a href="ws2-opensta-to-ir.html"><code>ws2-opensta-to-ir.md</code></a>.</p>
+<p>Deliverables:</p>
+<ul>
+<li>A Tcl script runnable by OpenSTA that loads Liberty + Verilog + SDF + (optionally) SPEF + SDC, then emits a machine-readable dump of timing annotations.</li>
+<li>A production-quality standalone Rust binary <code>opensta-to-ir</code> that parses OpenSTA's dump and emits timing IR (binary + JSON sidecar). Stable CLI, documented exit codes, clear diagnostics, man-page-worthy <code>--help</code>.</li>
+<li>Invocation wrapper handling OpenSTA subprocess lifecycle, stderr capture, exit-code checking, and error propagation up through <code>opensta-to-ir</code>'s own exit code.</li>
+<li>Assertion: if OpenSTA reports &lt; expected-count cells, exit non-zero with a clear diagnostic.</li>
+<li>Ships as part of Jacquard's release artefacts (binary distributable, documented in user-facing docs).</li>
+</ul>
+<h4 id="ws24--multi-corner-cli-flag-shipped-2026-05-02"><a class="header" href="#ws24--multi-corner-cli-flag-shipped-2026-05-02">WS2.4 — Multi-corner CLI flag (shipped 2026-05-02)</a></h4>
+<p><strong>Status:</strong> Shipped 2026-05-02 across commits <code>5822343</code> (consumer +
+<code>--timing-corner</code> flag), <code>530bb36</code> (builder dedupe + per-corner
+<code>[TimingValue]</code> collection), <code>59fde04</code> (Tcl driver per-scene emission</p>
+<ul>
+<li><code>--liberty NAME=PATH</code> syntax), and the integration test
+<code>aigpdk_dff_emits_per_corner_timing_values</code>. The historical scope
+notes below are kept for reference but are no longer "open work".</li>
+</ul>
+<p>The IR schema (<code>crates/timing-ir/schemas/timing_ir.fbs</code>) supports per-corner <code>TimingValue</code> vectors today, but every record lands in the IR with a single <code>TimingValue</code> keyed at <code>corner_index = 0</code>. Both producer (<code>opensta-to-ir</code>) and consumer (<code>flatten.rs</code>) treat the world as single-corner. Multi-corner support has three pieces:</p>
+<p><strong>Producer (Tcl + Rust binary):</strong></p>
+<ul>
+<li><code>crates/opensta-to-ir/tcl/dump_timing.tcl</code>: replace single <code>read_liberty</code> + hardcoded <code>CORNER 0 default tt 1.0 25.0</code> with OpenSTA's <code>define_corners</code> + per-corner <code>read_liberty -corner $name</code>. The existing arc / setup-hold / wire / clock-arrival walks already key by <code>(cell, …)</code>; wrap each in a per-corner loop and call <code>[edge arc_delays $arc -corner $c]</code>. Verify the exact <code>-corner</code> syntax against the locally built OpenSTA before relying on it (similar to the <code>vertex_worst_arrival_path</code> probe done for clock arrival in commit <code>c403cc8</code>).</li>
+<li><code>crates/opensta-to-ir/src/main.rs</code>: rework <code>--liberty PATH</code> to accept <code>--corner NAME=PATH[,V=…,T=…,P=…]</code> repeats. Validate at least one corner.</li>
+<li><code>crates/opensta-to-ir/src/builder.rs</code>: today each ARC / SETUP_HOLD / INTERCONNECT / CLOCK_ARRIVAL line lands as one IR record with one <code>TimingValue</code>. Multi-corner emits multiple lines per <code>(cell, driver, load, corner_index)</code> from Tcl; the builder dedupes them into one IR record carrying a <code>[TimingValue]</code> vector. Mechanical.</li>
+</ul>
+<p><strong>Consumer (jacquard root):</strong></p>
+<ul>
+<li>Add <code>--timing-corner &lt;NAME&gt;</code> to <code>SimArgs</code> / <code>CosimArgs</code> in <code>src/bin/jacquard.rs</code>; resolve to an index by walking <code>ir.corners()</code>.</li>
+<li>Replace <code>flatten.rs::ir_corner0_max(...)</code> (used in ~5 sites) with <code>ir_corner_max(idx)</code>. Thread the resolved index through <code>load_timing_from_ir</code>.</li>
+</ul>
+<p><strong>Fixture:</strong> sky130 ships multi-corner Liberty (<code>tt_025C_1v80</code>, <code>ss_-40C_1v62</code>, <code>ff_125C_1v95</code>) on disk via volare under <code>~/.volare/...</code> on dev machines that have run the cosim work. Wire two corners against the existing DFF / chain integration tests for a synthetic-but-real fixture; no external decision is needed before starting.</p>
+<p>Land in this order: fixture probe (~hour, verifies the OpenSTA Tcl <code>-corner</code> flag works as expected) → producer (Tcl + binary + builder) → consumer (CLI + flatten plumbing) → integration test exercising both corners. The risk concentrates in the first hour; everything after that is mechanical.</p>
+<h3 id="ws3--remove-hand-rolled-sdf-parser-wire-interim-runtime-hook"><a class="header" href="#ws3--remove-hand-rolled-sdf-parser-wire-interim-runtime-hook">WS3 — Remove hand-rolled SDF parser; wire interim runtime hook</a></h3>
+<p>Per ADR 0006, Jacquard's hand-rolled SDF parser is deleted in Phase 0 rather than maintained through later phases. The runtime gains a new IR input path; the old SDF input path becomes an interim convenience wrapper over WS2.</p>
+<p>Detailed design and phased implementation: <a href="ws3-delete-sdf-parser.html"><code>ws3-delete-sdf-parser.md</code></a>.</p>
+<p>Deliverables:</p>
+<ul>
+<li>Delete <code>src/sdf_parser.rs</code> and the SDF→Jacquard-internal-types code path. Remove all direct consumers.</li>
+<li>Add <code>jacquard sim --timing-ir &lt;path&gt;</code> as the canonical post-release timing input. Loads a pre-converted timing IR file, consumes it into the simulator's internal structures.</li>
+<li>Retarget the existing <code>--timing-sdf</code> / <code>--enable-timing</code> CLI behaviour: when SDF is provided, <code>jacquard sim</code> subprocesses <code>opensta-to-ir</code> internally to produce IR on the fly, then consumes it. Code site tagged <strong>"INTERIM per ADR 0006; removed before first release."</strong></li>
+<li>Verify no remaining imports of the deleted module. Verify all existing tests that previously used the hand-rolled parser now pass via the interim hook or via checked-in IR fixtures.</li>
+<li>No runtime behaviour regression on Jacquard's timing-related regression suite; any design that currently works must still work after WS3.</li>
+</ul>
+<h3 id="ws4--diff-harness-and-ci-integration"><a class="header" href="#ws4--diff-harness-and-ci-integration">WS4 — Diff harness and CI integration</a></h3>
+<blockquote>
+<p><strong>Reframed 2026-05-02; corpus + runner shipped 2026-05-02.</strong> The original WS4 was framed as "WS2 vs WS3 IR diff" (OpenSTA-derived against Jacquard's hand-rolled SDF parser-derived). WS3 deleted that parser; the diff has only one side now. Three reframings were considered: Option A (golden-IR regression corpus for <code>opensta-to-ir</code>) was chosen as the Phase 0 closure; Option B (end-to-end behavioural diff cxxrtl/CVC vs Jacquard cosim event traces) belongs in <code>timing-validation.md</code> as a Phase 1+ extension; Option C (cross-tool diff vs a future native Rust SDF→IR parser) is Phase 3 work per ADR 0006.</p>
+</blockquote>
+<p>Deliverables:</p>
+<ul>
+<li>A test binary <code>timing-ir-diff</code> that reads two IR files and produces a structured diff (missing arcs, mismatched delays past tolerance, mismatched provenance). <strong>Shipped</strong> in <code>crates/timing-ir/src/bin/timing-ir-diff.rs</code>.</li>
+<li>OpenSTA vendored as a git submodule at <code>vendor/opensta/</code>. Not built from Jacquard's build at runtime; present for CI version pinning, the <code>opensta-to-ir</code> integration tests, and stress-corpus access (see ADR 0005). <strong>Shipped.</strong></li>
+<li>A primary regression corpus at <code>tests/timing_ir/corpus/</code> — Jacquard-specific designs with checked-in <code>expected.jtir</code> (and a <code>expected.json</code> sidecar via <code>flatc --json</code> for human-readable diffs). <strong>Shipped 2026-05-02</strong> with the seed entry <code>aigpdk_dff_chain</code> (a minimal aigpdk DFF + AND with back-annotated wire delay; covers ARC + SETUP_HOLD + CLOCK_ARRIVAL + INTERCONNECT in a self-contained fixture). Sky130 entries (<code>inv_chain_pnr</code>, mcu_soc subset) remain to be added — the inputs exist under <code>tests/timing_test/</code>, but a CI strategy for installing the sky130 Liberty (likely volare) lands with them.</li>
+<li>A stress corpus at <code>tests/timing_ir/stress/</code> — a manifest file listing paths into <code>vendor/opensta/&lt;test-tree-subdir&gt;/</code>. Run nightly or pre-release. Exit criterion: no crashes, no hangs, no malformed IR; numerical agreement with OpenSTA not required. <strong>Manifest format specced in <code>tests/timing_ir/stress/README.md</code>; entries pending.</strong></li>
+<li>A regression test that, for each design in the primary corpus, runs <code>opensta-to-ir</code> on its inputs and diffs against <code>expected.jtir</code> via <code>timing_ir::diff::diff_irs</code> with the per-design tolerance from <code>manifest.toml</code>. <strong>Shipped</strong> as <code>crates/opensta-to-ir/tests/corpus.rs::corpus_designs_match_golden_ir</code>. Skips gracefully when OpenSTA isn't built; fails loud with a structured diff when there's a mismatch.</li>
+<li>A <code>regenerate-goldens</code> helper for the OpenSTA-pin-bump workflow: bump submodule, run regen, review the diff, commit golden + submodule together. <strong>Shipped</strong> as <code>scripts/regenerate-corpus-goldens.sh</code>. Iterates <code>tests/timing_ir/corpus/*/manifest.toml</code>, runs <code>opensta-to-ir</code> per entry with the manifest-specified flags, refreshes both <code>expected.jtir</code> and the <code>expected.json</code> sidecar via <code>flatc --json</code>. Accepts entry names as positional args for targeted regen.</li>
+<li>A diff-machinery mutation test that perturbs a known-good IR and asserts <code>timing-ir-diff</code> flags it. <strong>Shipped</strong> in <code>crates/timing-ir/tests/diff.rs</code>: <code>delay_mismatch_past_tolerance_detected</code>, <code>delay_mismatch_within_tolerance_is_clean</code>, <code>arc_only_in_a_detected</code>, <code>arc_only_in_b_detected</code>.</li>
+</ul>
+<p><strong>CI hookup landed 2026-05-02.</strong> The <code>opensta-to-ir-tests</code> job in <code>.github/workflows/ci.yml</code> builds CUDD (cached), builds OpenSTA via <code>scripts/build-opensta.sh</code> (cached on the submodule SHA), and runs <code>cargo test</code> inside <code>crates/opensta-to-ir</code> — covering the corpus regression test, the CLI tests, and the OpenSTA-driven integration tests on every PR. <code>scripts/build-opensta.sh</code> was extended to honour a <code>CUDD_DIR</code> env var so the CI job can hand it the source-built CUDD location without bypassing the script.</p>
+<p>What this catches: OpenSTA upstream regressions, dump-format / Tcl-driver regressions, accidental schema-breaking changes in <code>timing_ir.fbs</code>, builder bugs in <code>opensta-to-ir/src/builder.rs</code>, and the diff machinery itself (via the mutation tests that perturb an IR and assert <code>timing-ir-diff</code> flags the perturbation).</p>
+<p>What this <strong>doesn't</strong> catch: behavioural divergence between Jacquard and a reference simulator. That's <code>timing-validation.md</code>'s job (CVC/iverilog event-trace comparison) — the mcu_soc/sky130 90/90 reference match is the current one-design instance, generalisable in Phase 1+.</p>
+<h3 id="ws5--parser-success-assertions"><a class="header" href="#ws5--parser-success-assertions">WS5 — Parser-success assertions</a></h3>
+<blockquote>
+<p><strong>Done.</strong> Both halves shipped pre-this-section being marked.</p>
+</blockquote>
+<p>Deliverables (all live):</p>
+<ul>
+<li>Assertions in Jacquard's Liberty parsing code: non-zero cells parsed on non-empty input. Implemented as <code>TimingLibrary::parse</code> (<code>src/liberty_parser.rs:297-309</code>); rejects with a clear diagnostic naming the input byte count and pointing at the explicit override.</li>
+<li>Assertions in <code>opensta-to-ir</code> (WS2): non-zero IOPATHs / timing arcs resolved on non-trivial SDF input. Implemented as the <code>--min-arcs N</code> CLI flag (default 1) in the binary (<code>crates/opensta-to-ir/src/main.rs:71-77, :112-121</code>); exits with code <code>EXIT_MIN_ARCS_FAILED = 3</code> (see <code>:17</code>) and a diagnostic naming the produced count, the threshold, and the override flag.</li>
+<li>A way to override thresholds for intentionally-empty test inputs: <code>TimingLibrary::parse_unchecked</code> (<code>src/liberty_parser.rs:316</code>) for the Liberty path, <code>--allow-empty-parse</code> flag for the <code>opensta-to-ir</code> path.</li>
+</ul>
+<p>Tests covering both halves: <code>liberty_parser::parse_rejects_library_input_with_zero_cells</code> and <code>parse_unchecked_accepts_zero_cell_library</code>; <code>opensta-to-ir::cli::cli_min_arcs_failure_exit_3</code> (covers both the failure and the <code>--allow-empty-parse</code> override).</p>
+<p>(Original-plan assertions for Jacquard's SDF parser are obsolete — WS3 deleted the parser they were to guard.)</p>
+<h2 id="test-plan"><a class="header" href="#test-plan">Test plan</a></h2>
+<p>Tests live in <code>tests/timing_ir/</code>.</p>
+<ol>
+<li><strong>Schema round-trip</strong> (WS1). Construct a small IR in Rust, serialize to binary, deserialize, assert equality. Same for JSON.</li>
+<li><strong>OpenSTA converter unit tests</strong> (WS2). For a hand-crafted tiny design, invoke the converter, assert IR contents match expectation.</li>
+<li><strong>Jacquard converter unit tests</strong> (WS3). Same, on the same tiny design, through Jacquard's parser.</li>
+<li><strong>Corpus diff</strong> (WS4). For each design in the primary corpus, freshly produced <code>opensta-to-ir</code> output diffs clean against the checked-in golden <code>expected.jtir</code> within per-design tolerance.</li>
+<li><strong>Parser-success assertion tests</strong> (WS5). Feed empty Liberty, empty SDF, and non-empty-but-no-match Liberty. Each should fail loud with a clear diagnostic, not proceed silently.</li>
+</ol>
+<p>Tolerances:</p>
+<ul>
+<li>Delay values: ±5% or ±5 ps absolute floor, whichever is larger. Rationale: matches the existing <code>timing-validation.md</code> convention; per-design overrides allowed via <code>manifest.toml</code>.</li>
+<li>Missing arcs: zero tolerance. Every arc in the golden IR must appear in the freshly produced one (and vice versa).</li>
+</ul>
+<h2 id="exit-criteria-all-met"><a class="header" href="#exit-criteria-all-met">Exit criteria (all met)</a></h2>
+<p>Phase 0 is complete when <strong>all</strong> of the following hold:</p>
+<ol>
+<li>✅ <code>schemas/timing_ir.fbs</code> checked in (<code>crates/timing-ir/schemas/timing_ir.fbs</code>); round-trip unit tests in <code>crates/timing-ir/tests/</code>.</li>
+<li>✅ <code>opensta-to-ir</code> binary production-quality with stable CLI, documented exit codes, primary-corpus support. See <code>ws2-opensta-to-ir.md</code> (Implemented).</li>
+<li>✅ <code>src/sdf_parser.rs</code> deleted; <code>--timing-ir &lt;path&gt;</code> canonical; <code>--timing-sdf</code> is a subprocess wrapper over <code>opensta-to-ir</code> (per ADR 0006 § Amendment, the shipping mechanism — Phase 3 native Rust parser deferred indefinitely). See <code>ws3-delete-sdf-parser.md</code> (Implemented).</li>
+<li>✅ OpenSTA vendored at <code>vendor/opensta/</code> (ADR 0005).</li>
+<li>✅ <code>timing-ir-diff</code> runs in CI on the primary corpus (<code>opensta-to-ir-tests</code> job), passes cleanly, fails loud on regressions. Mutation tests in <code>crates/timing-ir/tests/diff.rs</code>.</li>
+<li>✅ Parser-success assertions live on both halves: <code>TimingLibrary::parse</code> and <code>opensta-to-ir --min-arcs</code>. See WS5 above.</li>
+<li>✅ No regression observed in Jacquard's timing-related tests after WS3 cutover.</li>
+<li>✅ <code>timing-validation.md</code> carries the forward-pointing note (line 3) explicitly stating its ±5% convention will be superseded by <code>timing-correctness.md</code> once Phase 0 ships. Phase 0 has shipped; that supersession is now effective in practice (the corpus tolerance is set per-design via <code>manifest.toml</code>). Removing the in-doc note is a small follow-up if anyone authoring against the page would benefit.</li>
+</ol>
+<h2 id="out-of-scope-deferred-to-later-phases"><a class="header" href="#out-of-scope-deferred-to-later-phases">Out of scope (deferred to later phases)</a></h2>
+<ul>
+<li>Native Rust SDF→IR converter. The hand-rolled parser is <strong>removed</strong> in Phase 0 WS3 (per ADR 0006); the native Rust replacement is Phase 3 work, <strong>deferred indefinitely</strong> per ADR 0006 § Amendment (no longer release-gating). SDF input ships via the <code>opensta-to-ir</code> subprocess wrapper. See <code>post-phase-0-roadmap.md</code> § Phase 3 for revival triggers.</li>
+<li>OpenTimer integration. Depends on the spike; tracked in <code>../spikes/opentimer-sky130.md</code> and its resulting phase-1 plan.</li>
+<li>Private PDK (GF130) test track. Tracked in ADR 0004; plumbing deferred to its own phase.</li>
+<li>SPEF IR. Separate from timing-annotation IR per ADR 0002.</li>
+<li>Runtime violation reporting improvements (R4 critical-path refinement JSON). Phase 1 or 2.</li>
+</ul>
+<h2 id="risks"><a class="header" href="#risks">Risks</a></h2>
+<ul>
+<li><strong>Licensing verification on vendored OpenSTA corpus.</strong> Per-file check needed before inclusion. May reduce corpus size if restrictive; acceptable.</li>
+<li><strong>FlatBuffers build integration friction.</strong> If <code>build.rs</code> codegen causes cross-compilation or CI issues, fall back to checked-in generated code with a documented <code>flatc</code> version. Pick one approach and stick to it; flip-flopping is worse than either option.</li>
+<li><strong>Tolerance tuning.</strong> Initial ±5% may prove too loose (hides bugs) or too tight (false positives from numerical differences). Plan to re-tune after first real-design data arrives.</li>
+<li><strong>WS3 cutover risk.</strong> Deleting the hand-rolled SDF parser risks regressing designs that depend on behaviour it currently provides. Exit criterion 7 requires a clean regression run before WS3 is considered complete. If coverage gaps emerge, walk-back options per ADR 0006 apply: add dialect shims to <code>opensta-to-ir</code>, or (now that Phase 3 is deferred) keep the hand-rolled parser available behind a feature flag until dialect parity is reached.</li>
+<li><strong>OpenSTA dialect coverage.</strong> OpenSTA may not accept every SDF dialect Jacquard's hand-rolled parser has been patched to handle. Such cases are tracked as either <code>opensta-to-ir</code> post-processing fixes or upstream OpenSTA contributions. Under no condition is the fix to reinstate the hand-rolled parser unless walk-back per ADR 0006 is formally triggered.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>../project-scope.md</code></li>
+<li><code>../timing-correctness.md</code> — acceptance criteria this plan satisfies.</li>
+<li><code>../adr/0001-opensta-as-oracle.md</code></li>
+<li><code>../adr/0002-timing-ir.md</code></li>
+<li><code>../spikes/opentimer-sky130.md</code> — runs in parallel; no dependency either way.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/gf180mcu-enablement.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/ws2-opensta-to-ir.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/gf180mcu-enablement.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/ws2-opensta-to-ir.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

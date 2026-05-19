@@ -1,0 +1,350 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>WS3: delete SDF parser - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="plan--ws3-delete-sdf-parser-wire-ir-consumer--interim-runtime-hook"><a class="header" href="#plan--ws3-delete-sdf-parser-wire-ir-consumer--interim-runtime-hook">Plan — WS3: delete SDF parser, wire IR consumer + interim runtime hook</a></h1>
+<p><strong>Status:</strong> Implemented — kept as historical record. Note: the "interim" / "pre-release-only" framing throughout this document describes the original ADR 0006 model. Per ADR 0006 § Amendment (2026-05-02), the runtime subprocess wrapper is now the shipping mechanism — Phase 3 (native Rust SDF→IR) is no longer release-gating. This document is preserved for the implementation phasing record; for current shipping intent see ADR 0006 § Amendment and <code>post-phase-0-roadmap.md</code> § Phase 3.</p>
+<p><strong>Phase:</strong> 0 (executes WS3 from <code>phase-0-ir-and-oracle.md</code>).
+<strong>Predecessors:</strong> WS2 phases 2.1 + 2.3-minimum (delay arcs + setup/hold checks landed). Sufficient IR coverage for runtime cutover.
+<strong>ADRs:</strong> 0002 (IR), 0006 (SDF preprocessing model + interim cutover; amended 2026-05-02).</p>
+<h2 id="goal"><a class="header" href="#goal">Goal</a></h2>
+<p>Delete <code>src/sdf_parser.rs</code> and migrate <code>src/flatten.rs</code>'s timing-loading to consume the timing IR directly. Wire <code>jacquard sim --timing-ir &lt;PATH&gt;</code> as the canonical input path, and (per ADR 0006) keep <code>--timing-sdf &lt;PATH&gt;</code> working pre-release as a contributor-ergonomics convenience that internally subprocesses <code>opensta-to-ir</code>.</p>
+<p>End state:</p>
+<ul>
+<li>No hand-rolled SDF parsing in the Jacquard codebase.</li>
+<li>Runtime SDF input still works (via internal subprocess) until first release.</li>
+<li><code>flatten.rs</code> consumes <code>timing_ir::TimingIR&lt;'_&gt;</code> for arc / setup / hold loading.</li>
+<li>All <code>flatten.rs</code> tests that previously hand-built SDF strings are migrated to build IR fixtures via the <code>timing-ir</code> crate's FlatBuffers builders.</li>
+</ul>
+<h2 id="surface-analysis"><a class="header" href="#surface-analysis">Surface analysis</a></h2>
+<p><code>src/sdf_parser.rs</code> (1099 lines) defines <code>SdfFile</code>, <code>SdfDelay</code>, <code>SdfCorner</code>, <code>TimingCheckType</code>, and parses SDF text. Consumers:</p>
+<ul>
+<li><code>src/flatten.rs</code> — <code>load_timing_from_sdf(...)</code> is the only non-test consumer; iterates <code>SdfFile.get_cell(path)</code>, uses <code>SdfDelay</code> for wire delays, <code>TimingCheckType::Setup/Hold</code> for check identification. ~200 lines of integration plus 7+ test fixtures that build SDF strings inline.</li>
+<li><code>src/sim/setup.rs</code> — translates <code>--sdf-corner</code> CLI string into <code>SdfCorner</code> and calls <code>SdfFile::parse_file</code>.</li>
+<li><code>src/aig.rs</code> — test imports only.</li>
+<li><code>src/lib.rs</code> — module declaration only.</li>
+</ul>
+<h2 id="architecture-changes"><a class="header" href="#architecture-changes">Architecture changes</a></h2>
+<h3 id="new-srcsimtiming_ir_loaderrs"><a class="header" href="#new-srcsimtiming_ir_loaderrs">New: <code>src/sim/timing_ir_loader.rs</code></a></h3>
+<p>Thin module that owns the IR file buffer (so consumers can borrow <code>TimingIR&lt;'_&gt;</code> views from it):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct TimingIrFile {
+    buf: Vec&lt;u8&gt;,
+}
+
+impl TimingIrFile {
+    pub fn from_path(path: &amp;Path) -&gt; Result&lt;Self, ...&gt; { ... }
+    pub fn from_bytes(buf: Vec&lt;u8&gt;) -&gt; Result&lt;Self, ...&gt; { ... }
+    pub fn view(&amp;self) -&gt; Result&lt;timing_ir::TimingIR&lt;'_&gt;, ...&gt; {
+        timing_ir::root_as_timing_ir(&amp;self.buf)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The <code>TimingIR</code> view holds a lifetime tied to the buffer. Callers keep the <code>TimingIrFile</code> alive while iterating the view.</p>
+<h3 id="modified-srcflattenrs"><a class="header" href="#modified-srcflattenrs">Modified: <code>src/flatten.rs</code></a></h3>
+<p>Replace <code>load_timing_from_sdf</code> with <code>load_timing_from_ir</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn load_timing_from_ir(
+    &amp;mut self,
+    aig: &amp;AIG,
+    netlistdb: &amp;NetlistDB,
+    ir: &amp;timing_ir::TimingIR&lt;'_&gt;,
+    clock_period_ps: u64,
+    liberty_fallback: Option&lt;&amp;TimingLibrary&gt;,
+    debug: bool,
+) { ... }
+<span class="boring">}</span></code></pre></pre>
+<p>Logic translation table:</p>
+<div class="table-wrapper"><table><thead><tr><th>Old (<code>SdfFile</code>)</th><th>New (<code>TimingIR&lt;'_&gt;</code>)</th></tr></thead><tbody>
+<tr><td><code>sdf.get_cell(path)</code></td><td>Index <code>ir.timing_arcs()</code> / <code>ir.setup_hold_checks()</code> by <code>cell_instance</code> (build a <code>HashMap&lt;&amp;str, _&gt;</code> once).</td></tr>
+<tr><td><code>cell.iopaths</code></td><td>Filter timing arcs by <code>cell_instance == path</code>.</td></tr>
+<tr><td><code>cell.timing_checks</code></td><td>Filter setup/hold checks by <code>cell_instance == path</code>.</td></tr>
+<tr><td><code>SdfDelay { rise, fall, ... }</code></td><td><code>TimingArc.rise_delay()</code> / <code>.fall_delay()</code> (per-corner); take corner 0 max for now.</td></tr>
+<tr><td><code>TimingCheckType::Setup</code> / <code>::Hold</code></td><td><code>SetupHoldCheck.setup()</code> / <code>.hold()</code> per record.</td></tr>
+<tr><td><code>cell.interconnect_delays</code></td><td><code>ir.interconnect_delays()</code> — empty until WS2.2 lands; tolerate.</td></tr>
+</tbody></table>
+</div>
+<p>The hierarchy-prefix detection (lines 1793-1820 of current flatten.rs) is independent of source format — same logic applies, just use IR's <code>cell_instance</code> strings instead of SDF's. Keep the heuristic.</p>
+<h3 id="modified-cli-surface-srcbinjacquardrs-srcsimsetuprs"><a class="header" href="#modified-cli-surface-srcbinjacquardrs-srcsimsetuprs">Modified: CLI surface (<code>src/bin/jacquard.rs</code>, <code>src/sim/setup.rs</code>)</a></h3>
+<ul>
+<li>Add <code>--timing-ir &lt;PATH&gt;</code> flag that loads IR directly via <code>TimingIrFile::from_path</code>.</li>
+<li>Retarget <code>--timing-sdf &lt;PATH&gt;</code> (and the existing <code>--sdf-corner</code>) to: spawn <code>opensta-to-ir</code> as a subprocess, capture its IR output, call <code>load_timing_from_ir</code>. Mark the code site <code>INTERIM per ADR 0006</code>.</li>
+<li>The interim hook needs Liberty + Verilog paths to feed <code>opensta-to-ir</code>; the <code>jacquard sim</code> CLI already takes those, so plumb them through.</li>
+<li>Keep <code>--sdf-corner</code> for backward compat — the interim wrapper passes it as <code>--corner</code> to <code>opensta-to-ir</code>.</li>
+</ul>
+<h3 id="deletions"><a class="header" href="#deletions">Deletions</a></h3>
+<ul>
+<li><code>src/sdf_parser.rs</code> — entire file.</li>
+<li><code>src/lib.rs</code> — <code>pub mod sdf_parser</code> line.</li>
+<li><code>src/aig.rs</code> — <code>use crate::sdf_parser::{SdfCorner, SdfFile}</code> test imports; rewrite or delete the affected tests.</li>
+<li><code>src/flatten.rs</code> — <code>use crate::sdf_parser::SdfFile</code>; rewrite test fixtures.</li>
+</ul>
+<h3 id="test-migration-strategy"><a class="header" href="#test-migration-strategy">Test migration strategy</a></h3>
+<p>Test fixtures in <code>flatten.rs</code> currently look like:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let sdf_content = r#"(DELAYFILE ... )"#;
+let sdf = SdfFile::parse_str(sdf_content, SdfCorner::Typ).expect("...");
+flat.load_timing_from_sdf(&amp;aig, &amp;netlistdb, &amp;sdf, ...);
+<span class="boring">}</span></code></pre></pre>
+<p>After cutover:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let ir_buf = build_test_ir(&amp;TestIrSpec {
+    arcs: vec![ /* (cell, from, to, rise_max, fall_max) */ ],
+    setup_hold: vec![ /* (cell, d, clk, edge, setup, hold) */ ],
+});
+let ir = root_as_timing_ir(&amp;ir_buf).unwrap();
+flat.load_timing_from_ir(&amp;aig, &amp;netlistdb, &amp;ir, ...);
+<span class="boring">}</span></code></pre></pre>
+<p>A <code>build_test_ir</code> helper in <code>flatten.rs::tests</code> mirrors <code>build_ir_with_arcs</code> from <code>crates/timing-ir/tests/diff.rs</code>. Single source of truth would be nicer; for now duplicate it (deduplication is a future cleanup).</p>
+<h2 id="phased-implementation"><a class="header" href="#phased-implementation">Phased implementation</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Phase</th><th>Scope</th><th>Exit signal</th></tr></thead><tbody>
+<tr><td>3.1</td><td>Add <code>src/sim/timing_ir_loader.rs</code> and <code>flatten.rs::load_timing_from_ir</code> (parallel to <code>_from_sdf</code>). No CLI surface, no deletions. Unit-test the new function with a small synthetic IR.</td><td>New function compiles + passes unit test; existing <code>_from_sdf</code> path still works.</td></tr>
+<tr><td>3.2</td><td>Add <code>jacquard sim --timing-ir &lt;PATH&gt;</code> CLI flag wired to <code>load_timing_from_ir</code>. End-to-end test: pre-generate IR via <code>opensta-to-ir</code>, run <code>jacquard sim --timing-ir</code>, compare against the existing <code>--timing-sdf</code> baseline.</td><td>A representative timing test (e.g., one of the existing <code>tests/timing_test/</code>) produces matching VCD output via both paths.</td></tr>
+<tr><td>3.3</td><td>Retarget <code>--timing-sdf</code> to subprocess <code>opensta-to-ir</code> internally, then consume IR. Tag the code site <code>INTERIM per ADR 0006</code>.</td><td>Existing <code>--timing-sdf</code> regression tests pass through the new path.</td></tr>
+<tr><td>3.4</td><td>Delete <code>src/sdf_parser.rs</code>. Migrate flatten.rs test fixtures from SDF strings to IR builders. Migrate aig.rs test imports.</td><td>All <code>cargo test --lib</code> tests pass; <code>src/sdf_parser.rs</code> is gone; the only <code>crate::sdf_parser::</code> reference is <code>git log</code>.</td></tr>
+</tbody></table>
+</div>
+<p>Each phase exits cleanly. Phase 3.4 is the irreversible deletion — gates on phases 3.1-3.3 having green CI on the migration tests.</p>
+<h2 id="open-questions"><a class="header" href="#open-questions">Open questions</a></h2>
+<ul>
+<li><strong>Hierarchy separator</strong>: SDF uses <code>.</code>, OpenSTA's default divider is <code>/</code>. Our IR's <code>cell_instance</code> strings come from OpenSTA so use <code>/</code>. The flatten.rs hierarchy-prefix detection logic uses <code>.</code>. After cutover, the logic needs to use <code>/</code>. Verify by running on a hierarchical design (MCU SoC) before declaring 3.4 ready.</li>
+<li><strong><code>--sdf-corner</code> semantics under IR</strong>: today this picks one of <code>Min/Typ/Max</code> from SDF triples. The IR has min/typ/max per <code>TimingValue</code> already; the corner selection becomes "pick which of the three to use" applied per-arc rather than per-file. Document the mapping.</li>
+<li><strong>Default-corner consistency</strong>: WS2 emits <code>default</code> as the corner name. Pre-existing Jacquard tests may not look at corner names — need to spot-check.</li>
+<li><strong><code>liberty_fallback</code> semantics</strong>: today, for cells absent from SDF, we fall back to Liberty-computed delays. Under IR, OpenSTA-computed values are already in the IR's arcs (as <code>Origin::Computed</code>). So <code>liberty_fallback</code> is potentially dead. Decide whether to drop it in 3.4 or keep as safety net.</li>
+<li><strong>Multi-corner (post-WS2.4)</strong>: when WS2.4 lands, the IR will have multiple corners. flatten.rs currently picks one. Define the per-corner selection contract — explicit corner-name CLI flag, or default to a named corner.</li>
+</ul>
+<h2 id="risks"><a class="header" href="#risks">Risks</a></h2>
+<ul>
+<li><strong>flatten.rs test churn</strong>: 7+ test fixtures need rewrites. Each is a focused mechanical change but the bulk adds up. Mitigation: a <code>build_test_ir</code> helper standardizes the pattern.</li>
+<li><strong>Hidden-bug exposure</strong>: the existing SDF parser had quirks. The IR parser has different ones (or none). Migration may surface bugs that were latent. Treat any test failure during 3.4 as a real bug, not "just adjust the test."</li>
+<li><strong>Hierarchy-separator regression</strong>: if not caught in phase 3.2 testing (which tests on a single design), it could land in 3.4 and break a hierarchical design that wasn't previously regression-tested. Mitigation: include a hierarchical design in the 3.2 verification matrix.</li>
+<li><strong>Cutover timing</strong>: WS3 lands while WS2.2 (interconnects) and WS2.4 (multi-corner) are still pending. flatten.rs's cutover assumes those will land later — test fixtures should not depend on interconnect delays or multi-corner behaviour for at-least-3.4 to pass.</li>
+</ul>
+<h2 id="walk-back"><a class="header" href="#walk-back">Walk-back</a></h2>
+<p>If 3.4 surfaces blocking issues, ADR 0006 already permits deferring deletion: keep <code>src/sdf_parser.rs</code> alive but tagged <code>LEGACY — superseded by IR consumer; remove before first release</code>, and ship preprocessing-only for the interim. The runtime SDF subprocess wrapper covers the contributor ergonomics. The native Rust SDF parser rewrite (Phase 3 in the original phasing) is the durable replacement.</p>
+<h2 id="non-goals"><a class="header" href="#non-goals">Non-goals</a></h2>
+<ul>
+<li>A native Rust SDF parser. (Original ADR 0006 Phase 3; not part of WS3.)</li>
+<li>Validating SDF round-trip equivalence between the old parser and OpenSTA. (CI corpus test in WS4/WS2.5 covers this when fixtures exist.)</li>
+<li>Refactoring the broader <code>flatten.rs</code> structure beyond what migration requires.</li>
+</ul>
+<h2 id="references"><a class="header" href="#references">References</a></h2>
+<ul>
+<li><code>../adr/0002-timing-ir.md</code> — IR contract.</li>
+<li><code>../adr/0006-sdf-preprocessing-model.md</code> — interim runtime subprocess + release-time cutover.</li>
+<li><code>phase-0-ir-and-oracle.md</code> — WS3 row.</li>
+<li><code>ws2-opensta-to-ir.md</code> — produces the IR this consumer reads.</li>
+<li><code>crates/opensta-to-ir/</code> — subprocess target for the interim <code>--timing-sdf</code> hook.</li>
+<li><code>crates/timing-ir/</code> — IR library + builders for test fixtures.</li>
+</ul>
+<hr />
+<p><strong>Last updated:</strong> 2026-04-28</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/ws2-opensta-to-ir.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/ws3-cosim-sdf-followup.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/ws2-opensta-to-ir.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/ws3-cosim-sdf-followup.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

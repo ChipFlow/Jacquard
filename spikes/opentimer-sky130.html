@@ -1,0 +1,379 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Spike — OpenTimer on SKY130 - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="spike--opentimer-on-sky130-and-mcu-soc"><a class="header" href="#spike--opentimer-on-sky130-and-mcu-soc">Spike — OpenTimer on SKY130 and MCU SoC</a></h1>
+<p><strong>Status:</strong> Proposed. Not yet executed.</p>
+<p><strong>Time box:</strong> Half a day. Extend by up to one day if initial signs are positive but hitting specific SKY130 quirks. Abort and fall back if first-four-hours progress is blocked.</p>
+<h2 id="goal"><a class="header" href="#goal">Goal</a></h2>
+<p>Determine whether OpenTimer (MIT, C++17) can reliably parse and analyse Jacquard's real-flow inputs — SKY130 Liberty and OpenLane2 MCU SoC post-P&amp;R output — well enough to serve as Jacquard's in-process reference STA (per ADR 0003).</p>
+<p>The outcome resolves ADR 0003's <code>Pending Spike</code> status to either <code>Accepted</code> or <code>Superseded</code>.</p>
+<h2 id="out-of-scope-for-this-spike"><a class="header" href="#out-of-scope-for-this-spike">Out of scope for this spike</a></h2>
+<ul>
+<li>C++ FFI / bindgen integration work. Pure spike on OpenTimer's standalone behaviour.</li>
+<li>Timing-IR integration. Establishing that OpenTimer produces usable arrival/slack output is sufficient; converting it to IR belongs in phase 1.</li>
+<li>Performance measurement beyond rough "does it complete in reasonable time."</li>
+<li>GF130 coverage. SKY130 is the spike target; GF130 private-track confirmation is later.</li>
+</ul>
+<h2 id="setup"><a class="header" href="#setup">Setup</a></h2>
+<p>Required artefacts (checked before starting):</p>
+<ol>
+<li>OpenTimer clone and local build (MIT licence, standard CMake).</li>
+<li>SKY130 Liberty file(s) matching the corner the MCU SoC flow uses. At minimum <code>sky130_fd_sc_hd__tt_025C_1v80.lib</code>.</li>
+<li>MCU SoC post-P&amp;R output: synthesised <code>.v</code>, SDC, and — critically — <code>.spef</code>. Check that the current OpenLane2 invocation is configured to produce SPEF; if not, enable it. OpenTimer requires SPEF, it does not consume SDF.</li>
+<li>Jacquard's current <code>timing-analysis</code> binary output on the same design for comparison.</li>
+<li>OpenSTA installed locally, for three-way comparison.</li>
+</ol>
+<h2 id="success-criteria"><a class="header" href="#success-criteria">Success criteria</a></h2>
+<p>The spike answers four questions. Each is a pass/fail observation, not a measurement.</p>
+<h3 id="q1--does-opentimer-parse-sky130-liberty-without-errors"><a class="header" href="#q1--does-opentimer-parse-sky130-liberty-without-errors">Q1 — Does OpenTimer parse SKY130 Liberty without errors?</a></h3>
+<ul>
+<li><strong>Pass:</strong> clean parse, no warnings that indicate misinterpreted cells.</li>
+<li><strong>Partial:</strong> parses but warns on specific cells — in particular <code>sky130_fd_sc_hd__dlygate4sd3_*</code> or anything with non-trivial conditional timing. Document which cells and whether their timing is discarded or mishandled.</li>
+<li><strong>Fail:</strong> parse errors, segfaults, or silently-wrong output on recognised cells.</li>
+</ul>
+<h3 id="q2--does-opentimer-compute-arrivals-on-the-mcu-soc-design"><a class="header" href="#q2--does-opentimer-compute-arrivals-on-the-mcu-soc-design">Q2 — Does OpenTimer compute arrivals on the MCU SoC design?</a></h3>
+<p>Feed <code>.lib</code> + <code>.v</code> + <code>.spef</code> + <code>.sdc</code>. Run <code>report_timing -worst 20</code> or equivalent. Observe:</p>
+<ul>
+<li><strong>Pass:</strong> produces a full timing report with reasonable-looking arrivals (non-zero, monotonic along paths).</li>
+<li><strong>Partial:</strong> produces a report but with suspect values (many zeros, missing cells, incomplete paths).</li>
+<li><strong>Fail:</strong> hangs, crashes, or refuses to analyse.</li>
+</ul>
+<h3 id="q3--does-opentimers-result-agree-with-opensta"><a class="header" href="#q3--does-opentimers-result-agree-with-opensta">Q3 — Does OpenTimer's result agree with OpenSTA?</a></h3>
+<p>Run OpenSTA on the same inputs, compare top-20 critical endpoints' arrivals. Declare tolerance: ±5% on arrival time, ±10 ps absolute floor for very short paths.</p>
+<ul>
+<li><strong>Pass:</strong> all top-20 endpoints within tolerance.</li>
+<li><strong>Partial:</strong> most within tolerance, a small number of outliers traceable to specific delay-model differences (e.g., CCS vs NLDM).</li>
+<li><strong>Fail:</strong> systematic disagreement suggesting OpenTimer is computing something meaningfully different. Investigate; if the disagreement is on SKY130 cell interpretation (a PDK handling issue) this is essentially a fail for our purposes.</li>
+</ul>
+<h3 id="q4--does-opentimers-result-correlate-with-jacquards-current-timing-analysis"><a class="header" href="#q4--does-opentimers-result-correlate-with-jacquards-current-timing-analysis">Q4 — Does OpenTimer's result correlate with Jacquard's current timing analysis?</a></h3>
+<p>Compare worst-slack and top-K endpoint lists (not exact values — pessimism differences are expected and documented). Observe:</p>
+<ul>
+<li><strong>Pass:</strong> top-K lists overlap substantially; worst-slack is on a comparable path.</li>
+<li><strong>Informational:</strong> any systematic discrepancy tells us what the pessimism delta actually looks like in practice. This data informs R4 (critical-path refinement reporting) whether OpenTimer is adopted or not.</li>
+</ul>
+<h2 id="decision-matrix"><a class="header" href="#decision-matrix">Decision matrix</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Q1</th><th>Q2</th><th>Q3</th><th>Outcome</th></tr></thead><tbody>
+<tr><td>Pass</td><td>Pass</td><td>Pass</td><td>ADR 0003 → Accepted. Proceed to phase 1 integration.</td></tr>
+<tr><td>Pass</td><td>Pass</td><td>Partial</td><td>ADR 0003 → Accepted with documented scope limits. Define where OpenTimer is authoritative vs deferred to OpenSTA.</td></tr>
+<tr><td>Pass</td><td>Partial</td><td>—</td><td>ADR 0003 → Accepted provisionally; spike extends to investigate Q2 anomalies.</td></tr>
+<tr><td>Partial</td><td>—</td><td>—</td><td>ADR 0003 → Accepted with SKY130 cell workarounds documented, or → Superseded if the workarounds are too invasive.</td></tr>
+<tr><td>Fail on any</td><td>—</td><td>—</td><td>ADR 0003 → Superseded. Fall back to OpenSTA-subprocess-only validation. Revisit libreda-sta or in-house walker as alternatives in a follow-up ADR.</td></tr>
+</tbody></table>
+</div>
+<h2 id="fallback"><a class="header" href="#fallback">Fallback</a></h2>
+<p>If the spike fails, Jacquard operates with:</p>
+<ul>
+<li>OpenSTA subprocess validation in CI (ADR 0001) as the sole timing-reference mechanism.</li>
+<li>No per-PR in-process timing cross-check; feedback timing degrades.</li>
+<li>Phase 1 drops OpenTimer integration work and refocuses on tightening OpenSTA-driven CI.</li>
+</ul>
+<p>Superseding ADR 0003 is clean — it is currently <code>Pending Spike</code> so no downstream work has accrued to it. Phases 0 and 2 are unaffected.</p>
+<h2 id="progress-log"><a class="header" href="#progress-log">Progress log</a></h2>
+<h3 id="setup-2026-04-23--2026-04-30"><a class="header" href="#setup-2026-04-23--2026-04-30">Setup (2026-04-23 → 2026-04-30)</a></h3>
+<ul>
+<li>OpenTimer 2.1.0 and OpenSTA 3.1.0 cloned to <code>Jacquard-depends/</code> and built
+locally. Build notes in that repo's <code>README.md</code>.</li>
+<li>SKY130 Liberty already on disk via volare:
+<code>~/.volare/volare/sky130/versions/c6d73a35f524070e85faff4a6a9eef49553ebc2b/sky130A/libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib</code>.</li>
+<li>Spike artefacts kept in this worktree under <code>spike-out/</code> (gitignored —
+reproducible from <code>Jacquard-depends/</code>).</li>
+</ul>
+<h3 id="q1--liberty-parse-2026-04-30--pass"><a class="header" href="#q1--liberty-parse-2026-04-30--pass">Q1 — Liberty parse (2026-04-30) — <strong>Pass</strong></a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Tool</th><th>Cells loaded</th><th>Wall time</th><th>Warnings</th></tr></thead><tbody>
+<tr><td>OpenTimer 2.1.0</td><td>428</td><td>0.12 s</td><td>1</td></tr>
+<tr><td>OpenSTA 3.1.0</td><td>428</td><td>0.18 s</td><td>0</td></tr>
+</tbody></table>
+</div>
+<p>Cell counts agree exactly. OpenSTA parses cleanly. OpenTimer emits one
+warning:</p>
+<pre><code>W celllib.cpp:274] unexpected lut template variable normalized_voltage
+</code></pre>
+<p>The <code>normalized_voltage</code> axis appears in exactly one place in the Liberty:
+the library-level <code>normalized_driver_waveform("driver_waveform_template")</code>
+block, which is CCS-driver-waveform data. No per-cell timing arc references
+it — <code>cell_rise</code>/<code>cell_fall</code>/<code>rise_constraint</code>/<code>fall_constraint</code> all use
+the NLDM templates <code>del_1_7_7</code>, <code>vio_3_3_1</code>, <code>constraint_3_0_1</code>. So the
+warning has no impact on arrival/slack computation under NLDM, which is
+what OpenTimer does anyway.</p>
+<p><strong>Operational note:</strong> OpenTimer's <code>read_celllib</code> is lazy — the parse only
+runs when an action like <code>update_timing</code> (or <code>report_*</code>) forces taskflow
+execution. Issuing <code>dump_celllib</code> immediately after <code>read_celllib</code> reports
+"celllib not found" because the read hasn't fired yet. Always insert
+<code>update_timing</code> before any inspection command.</p>
+<p>The documented <code>read_celllib -min|-max &lt;file&gt;</code> syntax silently no-ops; bare
+<code>read_celllib &lt;file&gt;</code> loads the lib as both min and max corners. Filed as a
+docs/build mismatch in our <code>Jacquard-depends/README.md</code>.</p>
+<h3 id="q2--arrival-computation-on-sky130-2026-05-01--fail"><a class="header" href="#q2--arrival-computation-on-sky130-2026-05-01--fail">Q2 — Arrival computation on SKY130 (2026-05-01) — <strong>Fail</strong></a></h3>
+<p>Used OpenSTA's bundled <code>gcd_sky130hd</code> example (a canonical SKY130-HD GCD
+with <code>.v</code>, <code>.sdc</code>, <code>.spef</code>, <code>.lib</code>) as a fast smoke test before tackling
+MCU-SoC SPEF generation. If OpenTimer can't handle this, the MCU-SoC
+effort is wasted.</p>
+<p><strong>OpenSTA baseline:</strong> clean run, period 5 ns, top arrival 4.82 ns,
+WNS 0.00, slack 0.09 met. 0.28 s wall, zero warnings.</p>
+<p><strong>OpenTimer:</strong> could not produce a single timing path. The result was
+<code>no critical path found</code>, <code>wns = nan</code>, <code>tns = nan</code> — even after working
+around the following issues, each of which had to be discovered and
+patched manually:</p>
+<div class="table-wrapper"><table><thead><tr><th>#</th><th>Issue</th><th>Workaround tried</th><th>Status</th></tr></thead><tbody>
+<tr><td>1</td><td>`read_celllib -min</td><td>-max <file>` (the documented syntax) silently no-ops</td><td>bare <code>read_celllib &lt;file&gt;</code> loads as both corners</td></tr>
+<tr><td>2</td><td><code>dump_*</code> after <code>read_*</code> reports state-not-loaded because the read is lazy</td><td>insert <code>update_timing</code> before any inspection</td><td>works</td></tr>
+<tr><td>3</td><td>Tap cells in post-P&amp;R Verilog (<code>sky130_fd_sc_hd__tapvpwrvgnd_*</code>) trigger 1040 <code>cell not found in celllib</code> errors and abort the netlist load</td><td>strip tap cell instances from Verilog</td><td>works</td></tr>
+<tr><td>4</td><td>OpenTimer's bundled SDC parser uses pre-TCL-8.5 syntax (<code>trace variable VAR w CMD</code>); fails on the system's TCL 8.6 with <code>bad option "variable"</code> and produces zero parsed commands — even on OpenTimer's own bundled examples</td><td>patch <code>ot/sdc/sdcparsercore.tcl:144</code> to <code>trace add variable sdc_version write __set_v</code></td><td>works (one-line fix; should be upstreamed)</td></tr>
+<tr><td>5</td><td>OpenSTA-style SDC with <code>set period 5 / expr $period * 0.2 / [all_inputs]</code> parses as zero commands</td><td>hand-write a literal SDC with <code>create_clock -name clk -period 5 [get_ports clk]</code></td><td>works for trivial constraints; non-trivial SDC remains uncovered</td></tr>
+<tr><td>6</td><td>SPEF <code>*PORTS</code> section (standard SPEF, IEEE 1481, emitted by OpenROAD/OpenLane) is rejected with a parse error pointing at the first port line</td><td>strip <code>*PORTS</code> block from SPEF before reading</td><td>works</td></tr>
+<tr><td>7</td><td>Verilog bus ports (<code>input [31:0] req_msg;</code>) are not bit-blasted by OpenTimer's Verilog parser, but post-P&amp;R SPEF references the bus as bit-indexed nets (<code>req_msg[0]</code>, <code>req_msg[1]</code>, …). 48 bus-element nets fail to match between netlist and SPEF</td><td>none found</td><td><strong>blocking</strong></td></tr>
+<tr><td>8</td><td>After all of the above, two interior pins (<code>_251_:B</code>, <code>_218_:B</code>) report "not found in rctree" and the timing graph remains disconnected enough that no path can be reported</td><td>not investigated further</td><td><strong>blocking</strong></td></tr>
+</tbody></table>
+</div>
+<p>Issues 7 and 8 mean that on a SKY130 design with bus ports — i.e. any
+design that talks to the rest of the world — OpenTimer cannot compute
+arrivals from a standard OpenROAD <code>.v</code>/<code>.spef</code> pair without inputs being
+pre-processed by code that doesn't exist.</p>
+<p>The cumulative finding is not "OpenTimer mishandles a few SKY130 cells".
+It is that <strong>OpenTimer's input pipeline (Verilog parser, SPEF parser,
+bundled SDC parser) is incomplete relative to what real OpenROAD-flow
+outputs contain</strong>, and the gaps fall on hot paths (bus ports, tap cells,
+modern TCL, OpenROAD-emitted SPEF). The cells themselves parse fine (Q1);
+it's the surrounding ecosystem that doesn't.</p>
+<h3 id="q3-q4--not-run"><a class="header" href="#q3-q4--not-run">Q3, Q4 — not run</a></h3>
+<p>Q3 (cross-check vs OpenSTA) and Q4 (correlation with Jacquard's
+<code>timing-analysis</code>) both depend on OpenTimer producing arrivals. With Q2
+unable to produce a single path, they're moot for this spike.</p>
+<h3 id="decision"><a class="header" href="#decision">Decision</a></h3>
+<p><strong>ADR 0003 → Superseded.</strong> Per the spike's decision matrix
+("Fail on any → ADR 0003 → Superseded. Fall back to OpenSTA-subprocess-only
+validation"), the right move is to retire the in-process-OpenTimer plan
+and lean on OpenSTA-subprocess validation (ADR 0001) as the sole timing
+reference. A follow-up ADR should consider libreda-sta or an in-house
+walker if an in-process reference is still wanted later.</p>
+<p>OpenTimer's strengths (in-process C++17, taskflow-based, MIT, fast for
+the academic benchmarks it ships with) are real, but the input-pipeline
+gaps are large enough that adopting it would mean owning a non-trivial
+fork — the opposite of what a "lightweight in-process reference" is
+supposed to be.</p>
+<p>The Liberty parser is genuinely capable (Q1 passed cleanly on the 12 MB
+SKY130 NLDM lib in 120 ms), so OpenTimer remains an option for future
+narrow tasks like Liberty introspection, but not as the STA engine.</p>
+<h3 id="setup-notes-worth-keeping"><a class="header" href="#setup-notes-worth-keeping">Setup notes worth keeping</a></h3>
+<ul>
+<li>OpenSTA bundles <code>gcd_sky130hd.{v,sdc,spef}</code> and <code>sky130hd_tt.lib.gz</code> —
+a cleaner SKY130 smoke-test fixture than anything we'd have produced
+from chipflow in the time we had.</li>
+<li><code>~/.volare/volare/sky130/versions/c6d73a35f524070e85faff4a6a9eef49553ebc2b/sky130A/...</code>
+is the live SKY130 PDK already on this machine (chipflow installs it).
+No need to fetch it separately.</li>
+</ul>
+<h2 id="deliverable"><a class="header" href="#deliverable">Deliverable</a></h2>
+<p>A short report added to this document as a "Spike outcome" section, summarising:</p>
+<ul>
+<li>Which Q1–Q4 answers were observed.</li>
+<li>Specific SKY130 cells where OpenTimer misbehaves (if any).</li>
+<li>Whether SPEF generation had to be added to the OpenLane2 flow, and what that change was.</li>
+<li>Decision: confirm, scope-limit, or supersede ADR 0003.</li>
+</ul>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li>ADR 0003 — OpenTimer as in-process reference STA.</li>
+<li><code>../timing-correctness.md</code> — requirement R2.</li>
+<li><code>../plans/phase-0-ir-and-oracle.md</code> — phase 0 (independent of this spike; runs in parallel).</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/multi-clock-and-stimulus-architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/multi-clock-and-stimulus-architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

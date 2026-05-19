@@ -1,0 +1,505 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Multi-clock and stimulus architecture - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="multi-clock-and-stimulus-architecture--exploratory-roadmap"><a class="header" href="#multi-clock-and-stimulus-architecture--exploratory-roadmap">Multi-clock and stimulus architecture — exploratory roadmap</a></h1>
+<p><strong>Status:</strong> Captured architectural thinking. Most phases here are
+demand-driven and will only be picked up when a real-world workload requires
+them. Phases 1 and 2 may be worth scheduling on their own merits in a future
+release; the rest are written down so the design space is on record when the
+need appears.</p>
+<p>This is a <strong>design-space</strong> doc, not a scheduling doc. It complements
+<code>post-phase-0-roadmap.md</code> (which schedules committed work) by capturing the
+architecture for two related areas — multi-clock-domain support and stimulus
+generation — that today have working but limited implementations.</p>
+<h2 id="why-now"><a class="header" href="#why-now">Why now</a></h2>
+<p>The conversation that produced this doc was about supporting cosim against
+external testbench environments (UVM, CocoTB) and external clock sources (PHY,
+audio, DFS). Two observations crystallised the architecture:</p>
+<ol>
+<li><strong>Real designs partition into large synchronous islands with thin
+boundaries.</strong> External-clock and DFS scenarios look intractable until you
+notice that &lt;1 % of nets typically cross domains; the bulk of the design is
+batchable inside one island.</li>
+<li><strong>Stimulus generation and stimulus consumption don't have to share a
+loop.</strong> Today cosim couples the testbench tick-by-tick to the GPU dispatch.
+Decoupling them — via streaming or full precompute — turns the GPU from a
+ping-ponging coprocessor into a stream consumer.</li>
+</ol>
+<p>Both observations point at architecture changes that compose cleanly with each
+other, with the existing multi-clock plumbing, and with the existing X-prop /
+timing-arrival infrastructure.</p>
+<h2 id="what-exists-today"><a class="header" href="#what-exists-today">What exists today</a></h2>
+<p>Worth pinning down so the gap is precise:</p>
+<ul>
+<li><strong>Multi-clock-domain functional support.</strong> <code>MultiClockScheduler</code> in
+<code>src/sim/cosim_metal.rs:1347</code> builds a tick-by-tick edge schedule over the
+LCM of all domains' periods (with GCD granularity). DFFs are tagged by clock
+domain via <code>clock_pin2aigpins</code> in <code>src/aig.rs:209</code>. Each scheduler tick
+asserts only the firing domains' posedge/negedge flag bits; the GPU kernel
+gates DFF write-back on those flags, so non-firing domains' DFFs hold.</li>
+<li><strong>LCM constraint.</strong> The scheduler asserts <code>schedule_len &lt;= 1_000_000</code>
+(<code>cosim_metal.rs:1376</code>). Commensurable periods (PLL-derived) work; truly
+non-commensurable external clocks (audio, USB-recovered, DFS-mid-flight) hit
+the cap.</li>
+<li><strong>Cosim stimulus.</strong> <code>InputDispatcher</code> (<code>src/sim/input_stim.rs</code>) consumes a
+chipflow-compatible <code>wait</code>/<code>action</code>/<code>stop</code> JSON command list. Peripheral
+models (<code>src/sim/models/</code>) drain queued actions per edge and emit events.
+Generation is interleaved with the GPU dispatch loop — every tick (or every
+few ticks) round-trips through the host.</li>
+<li><strong>VCD replay path.</strong> <code>jacquard sim</code> already runs from a precomputed input
+VCD with no host-side reactive logic. This is, in effect, the "Level 1"
+precomputed-edge mode described below; the gap is between cosim's reactive
+loop and sim's flat replay, not in the kernel itself.</li>
+<li><strong>CDC checking.</strong> None today. SDF setup/hold checks exist
+(<code>src/timing_report.rs</code>) but are not wired through any CDC-specific path.</li>
+</ul>
+<h2 id="architecture-two-orthogonal-axes"><a class="header" href="#architecture-two-orthogonal-axes">Architecture: two orthogonal axes</a></h2>
+<p>The work falls cleanly into two independent dimensions.</p>
+<h3 id="axis-1--spatial-synchronous-islands-with-thin-boundaries"><a class="header" href="#axis-1--spatial-synchronous-islands-with-thin-boundaries">Axis 1 — Spatial: synchronous islands with thin boundaries</a></h3>
+<p>A static analysis pass partitions the AIG into <strong>islands</strong>: maximal connected
+sets of gates whose transitive fanin/fanout stays inside one clock domain.
+Whatever's left is the <strong>boundary</strong> — combinational gates and DFFs whose data
+cones cross domains. In real designs the boundary is small, dominated by
+synchronizers (2FF), async FIFO control, and handshake glue.</p>
+<p>Per-island execution lets the GPU:</p>
+<ul>
+<li>Skip evaluation of an island whose state hasn't changed.</li>
+<li>Batch K consecutive ticks of a fast island into one kernel launch when the
+slow island has no edges in the window.</li>
+<li>Treat the boundary as a small mailbox (source-island outputs read by
+destination-island reads) rather than a global state vector.</li>
+</ul>
+<p>This is essentially <strong>functional partitioning</strong> for parallel discrete-event
+simulation, but the GPU dataflow model gets <em>more</em> benefit than a CPU sim
+because batched dataflow is exactly what a fast island's run-ahead window
+wants.</p>
+<h3 id="axis-2--temporal-stimulus-generation-decoupled-from-consumption"><a class="header" href="#axis-2--temporal-stimulus-generation-decoupled-from-consumption">Axis 2 — Temporal: stimulus generation decoupled from consumption</a></h3>
+<p>The cosim host loop is the throughput floor today. Decoupling has three
+levels:</p>
+<ul>
+<li><strong>Replay</strong> — the testbench has already produced a complete input VCD; the
+GPU just plays it back. Today's <code>jacquard sim</code> is this case.</li>
+<li><strong>Streaming buffer</strong> — testbench runs in a separate thread feeding a ring
+buffer of <code>(tick, input_op)</code> tuples. GPU consumes batches. As long as the
+producer keeps up <em>on average</em>, the GPU never stalls. Works because most
+ticks have no input change and peripheral state machines run far slower than
+the kernel.</li>
+<li><strong>Record-and-replay with divergence detection</strong> — pass 1 runs full cosim and
+records every input transition; pass 2 replays at line-rate while
+checksumming outputs against the recorded run. If outputs diverge, abort and
+fall back. Wins decisively for regression CI where most runs confirm
+"nothing externally observable changed".</li>
+</ul>
+<h2 id="phase-breakdown"><a class="header" href="#phase-breakdown">Phase breakdown</a></h2>
+<p>Each phase is independently shippable. The phase numbering here is local to
+this doc and should not be confused with the timing-IR phase numbering in
+<code>post-phase-0-roadmap.md</code>.</p>
+<div class="table-wrapper"><table><thead><tr><th>Phase</th><th>Topic</th><th>Trigger</th></tr></thead><tbody>
+<tr><td><strong>MC.1</strong></td><td>Static island partitioner (analysis only, emits metadata)</td><td>Standalone-useful for CDC reporting; could land in a future release without further work</td></tr>
+<tr><td><strong>MC.2</strong></td><td>Min-heap multi-clock scheduler (replaces LCM precompute)</td><td>First non-commensurable external clock or DFS use case lands</td></tr>
+<tr><td><strong>MC.3</strong></td><td>Streaming stimulus buffer (decouples testbench thread from kernel)</td><td>First workload where cosim CPU↔GPU round-trip is measured as the bottleneck</td></tr>
+<tr><td><strong>MC.4</strong></td><td>Per-island kernel dispatch + multi-rate batching</td><td>MC.1+MC.2 in place; first multi-domain workload large enough that whole-AIG eval per tick is wasteful</td></tr>
+<tr><td><strong>MC.5</strong></td><td>Record-and-replay with divergence detection</td><td>Regression CI throughput becomes a release blocker</td></tr>
+<tr><td><strong>MC.6+</strong></td><td>Speculation staircase, AOT trace compilation, profile-guided kernel specialization</td><td>Demand-driven; deferred until measurement shows residual sync overhead after MC.4</td></tr>
+</tbody></table>
+</div>
+<h3 id="mc1--static-island-partitioner"><a class="header" href="#mc1--static-island-partitioner">MC.1 — Static island partitioner</a></h3>
+<p>Walk the AIG; for each gate compute the set of clock domains its transitive
+fanin/fanout touches. Tag gates as <strong>island-internal</strong> (fanin and fanout both
+inside one domain) or <strong>boundary</strong> (touches more than one domain on either
+side). Emit per-island gate counts and a list of boundary gates as metadata
+on the existing <code>FlattenedScript</code>.</p>
+<p>What it enables on its own, even with no runtime change:</p>
+<ul>
+<li>Diagnostic: "this design has 14 inter-domain combinational paths from
+<code>audio_clk</code> → <code>core_clk</code> and 2 the other way". Useful for designers
+reviewing CDC structure.</li>
+<li>Data structure that MC.2 / MC.4 / CDC reporting all need.</li>
+<li>Sanity-check on the "&lt;1 %" boundary-surface assumption for the workloads
+that motivate further phases.</li>
+</ul>
+<p>Classification policy for derived signals (e.g. a sync-FIFO read pointer in
+<code>clock_b</code> qualified by an output of a sync chain from <code>clock_a</code>): classify
+aggressively. Only gates whose <em>direct</em> fanin includes pins from multiple
+domains are boundary; downstream gates fed by a domain-tagged
+pre-synchronizer output inherit that domain. This pushes the boundary in as
+close to the structural CDC crossing as possible and is what makes the
+"&lt;1 %" claim hold on real designs — a lazy classification that propagated
+"multi-domain" forward through every downstream cone would yield a
+boundary surface that swallowed half the design.</p>
+<p>Code locations: extends <code>aig.rs</code> (domain analysis on <code>DriverType</code>) and
+<code>flatten.rs</code> (metadata on <code>FlattenedScriptV1</code>). No kernel changes.</p>
+<h3 id="mc2--min-heap-multi-clock-scheduler"><a class="header" href="#mc2--min-heap-multi-clock-scheduler">MC.2 — Min-heap multi-clock scheduler</a></h3>
+<p>Replace <code>MultiClockScheduler</code>'s precomputed <code>Vec&lt;TickEdges&gt;</code> with a min-heap
+of <code>(next-edge-time, domain)</code> pairs. Pop the next edge, dispatch, push the
+domain's next edge back. No LCM constraint; non-commensurable periods are
+free. DFS support falls out: when the DUT writes a clock-control register,
+the host updates the heap entry's period.</p>
+<p>DFS hook design: explicit, not generic signal-watching. The cosim config
+declares <code>(control_signal, period_table)</code> pairs; the host polls the named
+bit each tick (cheap — one bit) and updates the heap. Generic
+"call-back-on-arbitrary-signal" is rejected as too coupled.</p>
+<p>Code locations: <code>MultiClockScheduler::new</code> and <code>build_edge_ops</code> in
+<code>cosim_metal.rs</code>. Same per-domain flag emission, different scheduling
+backend.</p>
+<h3 id="mc3--streaming-stimulus-buffer"><a class="header" href="#mc3--streaming-stimulus-buffer">MC.3 — Streaming stimulus buffer</a></h3>
+<p><code>InputDispatcher</code> becomes a trait; today's <code>FileDispatcher</code> is one
+implementation. New implementations:</p>
+<ul>
+<li><code>ThreadedDispatcher</code> — runs peripheral models on a separate thread; emits
+<code>(tick, input_op)</code> into a lock-free SPSC ring buffer; GPU loop consumes
+batches.</li>
+<li><code>StreamDispatcher</code> — same shape but the producer is a JSON-lines stream
+over a Unix socket / stdio (this is also the bridge to UVM/CocoTB peer
+testbenches).</li>
+</ul>
+<p>Latency budget: the producer must be at least one tick ahead of the
+consumer. For transaction-level workloads this is easy (peripheral state
+machines run orders of magnitude slower than the GPU). For sub-cycle
+reactive loops it isn't, and those workloads stay on the synchronous path.</p>
+<p>Code locations: refactor <code>input_stim.rs</code> around a trait; new module for
+ring-buffer plumbing; cosim main loop drains a batch per dispatch instead of
+one tick.</p>
+<h3 id="mc4--per-island-kernel-dispatch--multi-rate-batching"><a class="header" href="#mc4--per-island-kernel-dispatch--multi-rate-batching">MC.4 — Per-island kernel dispatch + multi-rate batching</a></h3>
+<p>Build per-island execution scripts (and one boundary script) from the
+metadata MC.1 produces. Cosim main loop becomes:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>loop {
+    let (next_t, domain) = scheduler.peek();
+    let lookahead = scheduler.next_other_domain_edge(domain) - now;
+    let edges_in_window = lookahead / domain.period;
+    dispatch(island_script[domain], edges = edges_in_window);
+    dispatch(boundary_script);  // only if boundary signals changed
+    advance_clock(now + edges_in_window * domain.period);
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Boundary mailbox lives in shared state-buffer slots that the source island's
+script writes and the destination island's script reads. Repcut continues to
+partition each island's script across GPU blocks independently.</p>
+<p>Tight-boundary gates (combinationally fed by both domains) force a sync
+point on every edge of either side; MC.1's metadata identifies these so the
+runtime knows when batching can extend.</p>
+<h3 id="mc5--record-and-replay-with-divergence-detection"><a class="header" href="#mc5--record-and-replay-with-divergence-detection">MC.5 — Record-and-replay with divergence detection</a></h3>
+<p>Add <code>--record-stimulus</code> to cosim that emits a complete tick-by-tick input
+VCD and a per-tick output checksum. Add <code>--replay-stimulus</code> to sim (or a
+new mode) that consumes the VCD, runs at line-rate, and verifies the
+checksum each batch.</p>
+<p>Divergence handling is two-tier, not just abort:</p>
+<ul>
+<li>Mismatch in <strong>watched signals</strong> (the existing cosim <code>signals_of_interest</code>
+set, or a <code>--watch</code> CLI argument) → abort and require re-recording. This
+is the genuine "the design's externally observable behaviour changed"
+case — the recording is now stale and replay is unsafe.</li>
+<li>Mismatch in <strong>unwatched signals</strong> → warn-and-continue against the
+recorded transitions. Internal microarchitectural changes that don't
+move the observable surface are normal during development; aborting on
+them defeats the purpose of accelerating regression CI, where most runs
+exist to confirm "nothing externally observable changed".</li>
+</ul>
+<p>The watchset is the user-visible policy lever — it specifies what
+"externally observable" means for this design. Default to the cosim
+output signals (the natural CI invariant) plus any user-declared
+checkpoint signals.</p>
+<p>Useful primarily as a regression-CI accelerator. Doesn't help one-off
+runs.</p>
+<p><strong>Cross-test sharing.</strong> A single design accumulates many test cases. The
+natural extension of record-and-replay is to share the design-side
+specialized kernel across all tests in the suite and vary only the
+stimulus recording. For a suite of N tests against one design, recording
+costs N× pass-1 (one per test, on demand or in parallel) but replay costs
+N× line-rate-kernel-launches sharing the same compiled state-buffer
+layout. That's a multiplicative win on top of per-test record-and-replay
+and is the actual leverage point for full-suite CI throughput.</p>
+<h3 id="mc6--deferred-sophistication"><a class="header" href="#mc6--deferred-sophistication">MC.6+ — Deferred sophistication</a></h3>
+<p>Documented now so the design space is on record:</p>
+<ul>
+<li><strong>Speculation staircase</strong> for hot boundaries: value prediction → protocol
+pattern recognition → control-slice reachable-set enumeration → full
+case enumeration. Each tier larger and cheaper-to-skip. Add a "case"
+dimension to the kernel dispatch only if measured sync overhead after
+MC.4 justifies it.</li>
+<li><strong>AOT trace compilation</strong>: when stimulus is fully known (replay mode),
+compile the schedule offline — fold constant inputs into AIG constants,
+merge no-op ticks, sort transitions by domain. Profile-guided
+specialization for designs with lots of "configured once at boot" inputs.
+Composes directly with MC.5: a recording <em>is</em> a complete stimulus trace,
+so the AOT compiler can fold every input value into the kernel
+unconditionally. The resulting binary is valid only until either the
+design or the recording changes, so the lifecycle model is "compile per
+(design SHA, recording SHA) pair, cache for the test session,
+invalidate on either source changing". Acceptable cost for a 100×-replay
+regression run; not for one-off interactive sim.</li>
+<li><strong>CDC verification mode</strong>: jitter injection on coincident edges and
+random X-injection on detected async-source paths. Reuses MC.1's
+boundary metadata and existing X-prop infrastructure. Distinct from
+static CDC checking (Spyglass, Real Intent), which is <strong>explicitly out
+of scope</strong> — that's a different product.</li>
+</ul>
+<h2 id="out-of-scope-explicit-non-goals"><a class="header" href="#out-of-scope-explicit-non-goals">Out of scope (explicit non-goals)</a></h2>
+<p>These come up adjacent and are worth being clear about:</p>
+<ul>
+<li><strong>Pin-level VPI / GPI fidelity.</strong> Implementing enough VPI for unmodified
+cocotb / SystemVerilog testbenches. The surface area is enormous and
+Jacquard would be lying about delta cycles, NBA regions, <code>#delay</code>
+semantics, and X-propagation behaviour. Use transaction-level peer
+protocols (the natural extension of <code>input.json</code> over a socket) instead.</li>
+<li><strong>Metastability simulation.</strong> No RTL simulator does this; CDC verification
+is structural/formal (Spyglass, JasperGold-CDC, Real Intent) and a
+separate product.</li>
+<li><strong>Structural CDC checking</strong> (synchronizer recognition rules, gray-code
+analysis). Different product. MC.1's boundary metadata enables a <em>light</em>
+diagnostic but not a verification flow.</li>
+<li><strong>DUT-internal <code>#delay</code>.</strong> Requires an event-driven kernel; destroys the
+batched dataflow that gives Jacquard its speedup. Permanently
+unsupported.</li>
+<li><strong>Async resets / latches in DUT.</strong> Same reason. Permanently unsupported
+(already documented in <code>CLAUDE.md</code>).</li>
+</ul>
+<h2 id="implementation-triggers"><a class="header" href="#implementation-triggers">Implementation triggers</a></h2>
+<p>When to revisit and pull which phase off the shelf:</p>
+<div class="table-wrapper"><table><thead><tr><th>Trigger</th><th>Pulls</th></tr></thead><tbody>
+<tr><td>First user workload with non-commensurable external clocks (audio, USB, DFS)</td><td>MC.2</td></tr>
+<tr><td>First UVM/CocoTB integration request reaches engineering scoping</td><td>MC.3</td></tr>
+<tr><td>User-visible CDC reporting requested</td><td>MC.1</td></tr>
+<tr><td>Multi-domain workload measurably bottlenecked on whole-AIG-per-tick eval</td><td>MC.1 + MC.4</td></tr>
+<tr><td>Regression CI total time exceeds release tolerance</td><td>MC.5</td></tr>
+<tr><td>Post-MC.4 measurement shows boundary-sync overhead &gt;10 %</td><td>MC.6 speculation tier 1 (value prediction)</td></tr>
+</tbody></table>
+</div>
+<h2 id="why-mc1-and-mc2-may-be-worth-doing-standalone"><a class="header" href="#why-mc1-and-mc2-may-be-worth-doing-standalone">Why MC.1 and MC.2 may be worth doing standalone</a></h2>
+<p>The user observation in the originating discussion was that MC.1 and MC.2 are
+worth carrying in a future release on their own merits, ahead of any specific
+workload demand. Rationale:</p>
+<ul>
+<li><strong>MC.1 has standalone diagnostic value.</strong> A "boundary report" for any
+multi-clock design — count of cross-domain combinational paths, location
+of inter-domain DFF samples — is useful to any user reviewing CDC
+structure, independent of whether the runtime ever uses the partition.</li>
+<li><strong>MC.2 lifts a real correctness limit.</strong> The current LCM cap silently
+fails on legitimate designs (any audio-clock SoC, anything with DFS).
+Replacing precompute with a min-heap is a small, contained change that
+removes a category of "your design doesn't fit" errors.</li>
+<li><strong>Both are foundational</strong> for the rest of the architecture. Doing them
+early means later phases pick up cleanly.</li>
+</ul>
+<p>If MC.1 + MC.2 ship in isolation, they don't commit Jacquard to any of the
+later phases. Each later phase remains demand-driven.</p>
+<h2 id="references"><a class="header" href="#references">References</a></h2>
+<ul>
+<li>Current multi-clock infrastructure: <code>src/sim/cosim_metal.rs:855</code> and
+following (<code>ClockDomainFlags</code>, <code>MultiClockScheduler</code>).</li>
+<li>Per-DFF clock-domain tagging: <code>src/aig.rs:204</code> (<code>clock_pin2aigpins</code>).</li>
+<li>Cosim stimulus protocol: <code>src/sim/input_stim.rs</code>,
+<code>src/sim/models/mod.rs</code>.</li>
+<li>Existing precomputed-edge path (replay): <code>jacquard sim</code> and
+<code>src/sim/vcd_io.rs</code>.</li>
+<li>Adjacent committed roadmap: <code>docs/plans/post-phase-0-roadmap.md</code>.</li>
+<li>Synchronous-only constraint and rationale: <code>CLAUDE.md</code> "Key limitation".</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../plans/ws3-cosim-sdf-followup.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../spikes/opentimer-sky130.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../plans/ws3-cosim-sdf-followup.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../spikes/opentimer-sky130.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

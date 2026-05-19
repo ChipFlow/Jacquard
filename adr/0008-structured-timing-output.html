@@ -1,0 +1,315 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>0008 — Structured timing output as first-class deliverable - Jacquard Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Jacquard Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/ChipFlow/Jacquard" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="adr-0008--structured-timing-output-as-first-class-deliverable"><a class="header" href="#adr-0008--structured-timing-output-as-first-class-deliverable">ADR 0008 — Structured timing output as first-class deliverable</a></h1>
+<p><strong>Status:</strong> Approved.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Jacquard produces timing information today through three channels: timed VCD (<code>--timing-vcd</code>), per-violation <code>clilog::warn!</code> messages on stderr, and an in-process <code>SimStats</code> counter. The <code>why-jacquard.md</code> analysis identifies a gap between the timing data Jacquard <em>has</em> internally and the answers users actually need from a flow:</p>
+<div class="table-wrapper"><table><thead><tr><th>User question</th><th>Today</th></tr></thead><tbody>
+<tr><td>Did my workload trip any violations?</td><td><code>SimStats</code> counts (in-process API only)</td></tr>
+<tr><td>Which DFFs nearly missed timing?</td><td>Not extractable without parsing stderr</td></tr>
+<tr><td>Show me arrival distribution per signal</td><td>Reconstructable from --timing-vcd via post-processing only</td></tr>
+<tr><td>Which DFF was that violation on?</td><td>State-word index + manual lookup</td></tr>
+<tr><td>What path caused the worst arrival?</td><td>Not available</td></tr>
+<tr><td>Run this in CI and fail if any violation</td><td>Possible only via stderr grep</td></tr>
+</tbody></table>
+</div>
+<p>The most acute problem: stderr violation messages identify a <em>state-word index</em>, not a signal name. Mapping back to "which DFF, which path" requires manual investigation. On a violating design the message volume can be enormous (one warning per word per cycle per type). The data needed to do better — hierarchical signal names, DFF instance paths, per-DFF arrival distributions — already exists in the netlistdb and event buffer; it is simply not surfaced in usable form.</p>
+<p>This ADR is about making Jacquard's timing output <strong>useful in a real flow</strong> rather than merely <em>produced</em>. The substantive work in ADR 0007 (model fidelity) is wasted if no one can extract the answers.</p>
+<p>The full design analysis is in <code>docs/why-jacquard.md</code>, "Output interface" section.</p>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p>Treat structured, machine-readable timing output as a first-class shipping deliverable, not an optional improvement. Land the work in priority order, where priority is set by <em>user impact per implementation cost</em> not by technical interest.</p>
+<h3 id="required-outputs"><a class="header" href="#required-outputs">Required outputs</a></h3>
+<p>The following are required for Jacquard to be considered usable for vector-driven timing analysis in a real flow. They land <strong>before</strong> any further fidelity work past ADR 0007 Pillar B Stage 1+2.</p>
+<ol>
+<li>
+<p><strong>Symbolic violation messages.</strong> Replace state-word indices with hierarchical signal names in stderr violation output. Mapping data already exists in netlistdb. Cost: contained edit in <code>src/event_buffer.rs:305-338</code> plus name-resolution helper. Highest UX impact per LoC of any improvement on this list.</p>
+</li>
+<li>
+<p><strong><code>--timing-report &lt;path.json&gt;</code>.</strong> Structured JSON document at end-of-run containing:</p>
+<ul>
+<li>Per-DFF worst arrival, worst slack, violation count over the run.</li>
+<li>Per-cycle violation list (cycle, signal name, hierarchical path, arrival, constraint, slack).</li>
+<li>Aggregate stats: total violations, distribution buckets, peak arrival per clock domain.</li>
+<li>Per-signal activity summary: transition count, average/max arrival, idle cycles.</li>
+<li>Run metadata: clock period, SDF/IR file, design hash, vector source.</li>
+</ul>
+<p>Required for CI integration and any downstream tooling. Schema versioned; additive extension policy mirrors <code>crates/timing-ir</code>.</p>
+</li>
+<li>
+<p><strong><code>--timing-summary</code>.</strong> Fast text summary, no VCD. Designed for scripts and human inspection of long runs. Contents:</p>
+<ul>
+<li>Vectors run, clock period, corner.</li>
+<li>Setup/hold violation totals.</li>
+<li>Worst-slack DFF (setup and hold) with hierarchical path.</li>
+<li>Peak arrival per writeout vs clock budget, with margin percentage.</li>
+</ul>
+<p>Cost: trivial wrapper over (2)'s data.</p>
+</li>
+<li>
+<p><strong>Per-DFF worst-slack ranking.</strong> Top-N DFFs by closest-to-violation slack across the entire run, even when no violation occurred. Surfaces "where am I close to the edge" without requiring a violation to actually trip. Output as part of (2) and (3); also accessible via a dedicated <code>--worst-slack-n N</code> flag for quick inspection.</p>
+</li>
+</ol>
+<h3 id="optional--later-outputs"><a class="header" href="#optional--later-outputs">Optional / later outputs</a></h3>
+<p>The following are higher-value-but-lower-priority. They land after the four required items above, in any order driven by user demand.</p>
+<ol start="5">
+<li>
+<p><strong><code>--arrival-histogram &lt;pattern&gt;</code>.</strong> Per-signal arrival histogram dump for matched signal patterns, as JSON or CSV. Foundation for activity-based power analysis.</p>
+</li>
+<li>
+<p><strong><code>--sta-cross-reference &lt;opensta-paths.txt&gt;</code>.</strong> Cross-reference OpenSTA's critical-path report against observed worst arrivals. Closes the loop between vector-driven and static analysis. Coverage-style "of the top-N STA paths, which were exercised, and at what observed arrival." (Originally framed against OpenTimer; ADR 0003 was Superseded — OpenSTA is the only STA tool Jacquard interoperates with now.)</p>
+</li>
+<li>
+<p><strong>Path-back-trace from worst-arrival DFF.</strong> Given a flagged DFF, walk the max-of-fanin chain backward to the source AIG pin / primary input, emitting the path with per-edge contribution. Most expensive item on this list; only useful once the cheaper items are in place.</p>
+</li>
+</ol>
+<h3 id="backward-compatibility"><a class="header" href="#backward-compatibility">Backward compatibility</a></h3>
+<ul>
+<li>All new outputs are opt-in via flags. Existing stderr behaviour and <code>--timing-vcd</code> semantics are unchanged.</li>
+<li>Symbolic violation messages (item 1) <strong>do</strong> change existing stderr format. This is intentional: the current state-word-index format is not a stable contract and is not consumed by any known automation. Format change documented in changelog at land time.</li>
+</ul>
+<h3 id="output-stability-contract"><a class="header" href="#output-stability-contract">Output stability contract</a></h3>
+<ul>
+<li>The <code>--timing-report</code> JSON is a stable consumer-facing format. Schema versioned. Additive-only extensions per the IR convention; breaking changes require a major version bump and a transition period.</li>
+<li><code>--timing-summary</code> is human-readable and explicitly <strong>not</strong> stable for parsing. Tools should consume the JSON.</li>
+<li>Stderr violation messages remain human-oriented; tools should not parse them.</li>
+</ul>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<ul>
+<li>Jacquard becomes usable in CI without bespoke stderr parsing. Existing users who scrape stderr will need to migrate to the JSON report; the migration window is the release in which symbolic messages land.</li>
+<li>The <code>SimStats</code> in-process API gains a public counterpart: end-of-run JSON. This raises the bar for changes to either — they must agree.</li>
+<li>Documentation gains a "Jacquard timing report format" reference page. Sample reports from the corpus designs are checked in to <code>tests/timing_ir/corpus/</code> alongside golden IR.</li>
+<li>The <code>why-jacquard.md</code> positioning becomes truthful: the user-facing claim "vector-driven setup/hold answers at GPU scale" is backed by an interface that delivers them.</li>
+</ul>
+<h2 id="walk-back-options"><a class="header" href="#walk-back-options">Walk-back options</a></h2>
+<ul>
+<li><strong>If the JSON schema causes consumer-tooling friction</strong>, the format may be extended additively but not narrowed. Existing consumers must continue to work. If a fundamental rethink is required, ship a v2 alongside v1 with a deprecation window.</li>
+<li><strong>If symbolic name resolution is too slow at scale</strong> (millions of DFFs, very long runs), the resolution step becomes opt-in via flag, with the existing state-word-index format retained as a fast-path default. No evidence yet that this is a problem; treated as a deferred consequence.</li>
+<li><strong>If users specifically want the path-back-trace (item 7)</strong> before the cheaper items are scheduled, it can be promoted, but only once items 1–4 are in place. Path-back-trace without symbolic names is unusable.</li>
+</ul>
+<h2 id="priority-and-effort-estimate"><a class="header" href="#priority-and-effort-estimate">Priority and effort estimate</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Item</th><th>Effort</th><th>Blocks</th><th>User impact</th></tr></thead><tbody>
+<tr><td>1. Symbolic violations</td><td>1–2 days</td><td>Nothing</td><td>High (turns stderr from noise to signal)</td></tr>
+<tr><td>2. JSON report</td><td>3–5 days</td><td>CI integration</td><td>High</td></tr>
+<tr><td>3. Text summary</td><td>1 day (after #2)</td><td>Human dashboards</td><td>Medium</td></tr>
+<tr><td>4. Worst-slack ranking</td><td>1–2 days (folds into #2)</td><td>"Am I close?"</td><td>High</td></tr>
+<tr><td>5. Arrival histogram</td><td>3–5 days</td><td>Power analysis</td><td>Medium</td></tr>
+<tr><td>6. STA cross-ref</td><td>1 week</td><td>Vector coverage report</td><td>Medium</td></tr>
+<tr><td>7. Path-back-trace</td><td>2–3 weeks</td><td>Forensics</td><td>Lower-frequency-but-high-value</td></tr>
+</tbody></table>
+</div>
+<p>Items 1–4 are a single workstream, ~2 weeks total. They constitute the "Jacquard is now usable" bar. Items 5–7 are scheduled per user demand after that.</p>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<ul>
+<li><code>../why-jacquard.md</code> — positioning analysis and full output-interface design.</li>
+<li><code>../timing-violations.md</code> — current violation detection mechanics; updated to describe new outputs once they land.</li>
+<li><code>../timing-validation.md</code> — validation tolerances; will reference the JSON report format for golden comparisons.</li>
+<li><code>../adr/0002-timing-ir.md</code> — IR schema versioning policy that the JSON report mirrors.</li>
+<li><code>../project-scope.md</code> — output stability constraints that apply to any user-facing format.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../adr/0007-timing-model-fidelity-roadmap.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../plans/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../adr/0007-timing-model-fidelity-roadmap.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../plans/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
