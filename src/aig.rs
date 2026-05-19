@@ -3327,6 +3327,148 @@ mod xprop_tests {
         drop(x_capable);
     }
 
+    /// End-to-end: a synthetic netlist instantiating an
+    /// OCD-SRAM-shaped opaque RAM, plus a TOML manifest declaring it
+    /// as `kind = "ram"`, should build cleanly through
+    /// `AIG::from_netlistdb_with_cells`. Verifies the
+    /// third-party-IP unblock — `gf180mcu_ocd_ip_sram__sram1024x8m8wm1`
+    /// is not in Jacquard's vendored library, has no built-in pin
+    /// table, previously fell through to the AIGPDK AND2/INV/BUF
+    /// fallback and produced wrong results.
+    #[test]
+    fn test_opaque_ram_end_to_end() {
+        use crate::cell_library::RuntimeCellLibrary;
+        use compact_str::CompactString;
+        use netlistdb::LeafPinProvider;
+        use sverilogparse::SVerilogRange;
+
+        // Blackbox interface mirroring
+        // gf180mcu_ocd_ip_sram__sram1024x8m8wm1. Uses the
+        // module-header-only port list with separate declarations
+        // (sverilogparse's preferred shape — confirmed by the
+        // existing AIGPDK / SKY130 / GF180MCU vendored blackboxes).
+        const OCD_SRAM_BLACKBOX: &str = "\
+module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (CLK, CEN, GWEN, WEN, A, D, Q);
+  input CLK;
+  input CEN;
+  input GWEN;
+  input [7:0] WEN;
+  input [9:0] A;
+  input [7:0] D;
+  output [7:0] Q;
+endmodule
+";
+
+        // Tiny top instantiating one SRAM. Inputs are primary ports;
+        // outputs Q[7:0] are the cell's output, routed to top-level
+        // outputs so they end up in the netlist's primary-output set.
+        const TOP_VERILOG: &str = "\
+module top(clk, cen, gwen, wen, a, d, q);
+  input clk, cen, gwen;
+  input [7:0] wen;
+  input [9:0] a;
+  input [7:0] d;
+  output [7:0] q;
+  gf180mcu_ocd_ip_sram__sram1024x8m8wm1 u_sram (
+    .CLK(clk), .CEN(cen), .GWEN(gwen),
+    .WEN(wen), .A(a), .D(d), .Q(q)
+  );
+endmodule
+";
+
+        // Write the cell library file (with sibling manifest) so the
+        // sverilogparse-backed loader sees them via the public API.
+        let dir = tempfile::TempDir::new().unwrap();
+        let lib_path = dir.path().join("ocd_sram.v");
+        std::fs::write(&lib_path, OCD_SRAM_BLACKBOX).unwrap();
+        std::fs::write(
+            dir.path().join("ocd_sram.cells.toml"),
+            "schema_version = \"1.0\"\n\
+             [cells.gf180mcu_ocd_ip_sram__sram1024x8m8wm1]\n\
+             kind = \"ram\"\n",
+        )
+        .unwrap();
+
+        let runtime_lib = RuntimeCellLibrary::from_files(&[lib_path]).unwrap();
+
+        // Sanity: the manifest was loaded.
+        assert_eq!(
+            runtime_lib.lookup_kind("gf180mcu_ocd_ip_sram__sram1024x8m8wm1"),
+            Some(crate::cell_library::CellKind::Ram)
+        );
+        assert_eq!(
+            runtime_lib.lookup_pin(
+                &CompactString::new("gf180mcu_ocd_ip_sram__sram1024x8m8wm1"),
+                &CompactString::new("Q")
+            ),
+            Some(netlistdb::Direction::O)
+        );
+
+        // The runtime library is the only pin-direction source for
+        // this cell — no built-in fallback needed here. The
+        // top module's port directions come from the inline
+        // declarations themselves, which sverilogparse handles
+        // directly.
+        struct NoFallback;
+        impl LeafPinProvider for NoFallback {
+            fn direction_of(
+                &self,
+                _: &CompactString,
+                _: &CompactString,
+                _: Option<isize>,
+            ) -> netlistdb::Direction {
+                netlistdb::Direction::Unknown
+            }
+            fn width_of(
+                &self,
+                _: &CompactString,
+                _: &CompactString,
+            ) -> Option<SVerilogRange> {
+                None
+            }
+        }
+        let fallback = NoFallback;
+        let provider = crate::cell_library::ChainedPinProvider {
+            runtime: &runtime_lib,
+            fallback: &fallback,
+        };
+
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            TOP_VERILOG,
+            Some("top"),
+            &provider,
+        )
+        .expect("netlist parse");
+
+        let aig = AIG::from_netlistdb_with_cells(&nl, Some(&runtime_lib));
+
+        // The OCD SRAM cell now has a `srams` entry — opaque-RAM
+        // allocation path took effect.
+        assert!(
+            !aig.srams.is_empty(),
+            "expected at least one srams entry for the opaque RAM"
+        );
+        let (cellid, ram) = aig.srams.iter().next().unwrap();
+        // First 8 slots of port_r_rd_data populated (Q[7:0]); the
+        // remaining 24 stay default-zero.
+        let populated = ram.port_r_rd_data.iter().filter(|&&p| p != 0).count();
+        assert_eq!(
+            populated, 8,
+            "expected 8 populated rd_data slots for an 8-bit opaque RAM (got {populated})"
+        );
+
+        // X-source enumeration tolerates the zero slots without panic.
+        let x_sources = aig.compute_x_sources();
+        let x_count = x_sources.iter().filter(|&&x| x).count();
+        assert_eq!(
+            x_count, 8,
+            "expected 8 X-sources (the 8 OCD SRAM Q outputs) — got {x_count}"
+        );
+
+        // The cell origin is recorded with the manifest-declared name.
+        let _ = cellid; // future check: hierarchical instance path
+    }
+
     #[test]
     fn test_x_sources_narrow_opaque_ram() {
         // Opaque-RAM cells declared via the runtime cell-library
