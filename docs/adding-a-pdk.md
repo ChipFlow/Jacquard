@@ -11,13 +11,32 @@ SRAMs). Supporting a foundry PDK like SKY130 requires teaching the simulator how
 to interpret the PDK's standard cells: their pin directions, their boolean
 function, and which ones are sequential.
 
-The integration touches five areas:
+There are now **two pathways** for enabling new cells; pick based on what
+you're adding:
+
+- **Built-in PDK enablement** (this guide). For full standard-cell
+  libraries — AND gates, DFFs, sequential cells with explicit AIG
+  decomposition rules. Requires Rust code: pin tables, classifiers,
+  decomposition functions, AIG builder hooks.
+- **Runtime cell library** (`--cell-library` + `.cells.toml`
+  manifest). For third-party IP, hard macros, foundry memories, and
+  any other cells that *don't* need new AIG decomposition rules — i.e.
+  cells that act as opaque outputs (RAM macros), filler/cap blocks,
+  or IO pads. See **ADR 0010** and `docs/plans/declarative-cell-metadata.md`
+  for the recipe. **No Jacquard PR required** — users ship a manifest
+  alongside their netlist.
+
+This guide covers the built-in pathway, which touches five areas:
 
 1. **Library detection** -- recognizing cell names from a netlist
 2. **Pin direction provider** -- telling the netlist parser which pins are inputs/outputs
 3. **Cell classification** -- identifying sequential, tie, and multi-output cells
 4. **Behavioral decomposition** -- converting PDK cells to AIG (AND/NOT) primitives
 5. **CLI wiring** -- connecting it all together
+
+If you're adding just a memory macro or other behaviourally-opaque IP,
+**skip ahead to "Adding third-party IP via runtime manifest"** at the
+end of this document — it's a 6-line TOML entry, not a Rust PR.
 
 ## Prerequisites
 
@@ -338,3 +357,75 @@ For a complete PDK integration, you need:
   `dlygate4sd3`) that must be treated as combinational. If your PDK's delay
   cells have names that collide with sequential cell prefixes, the whitelist
   approach prevents misclassification.
+
+## Adding third-party IP via runtime manifest
+
+If you're adding a memory macro, IO pad, hard block, or filler library
+— anything that doesn't need new AIG decomposition rules — the runtime
+cell-library pathway (ADR 0010) is the right route. **No Jacquard PR
+required.** Ship a Verilog blackbox file plus a TOML manifest alongside
+your design.
+
+### Step 1: Provide the cell's Verilog interface
+
+The blackbox just declares the cell's module + port directions. The
+foundry typically ships this (`<library>__blackbox.v`). Example for the
+OCD GF180MCU SRAM:
+
+```verilog
+module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (CLK, CEN, GWEN, WEN, A, D, Q);
+  input CLK;
+  input CEN;
+  input GWEN;
+  input [7:0] WEN;
+  input [9:0] A;
+  input [7:0] D;
+  output [7:0] Q;
+endmodule
+```
+
+### Step 2: Write the TOML manifest
+
+Co-locate `<library>.cells.toml` next to `<library>.v` (it autoloads
+when present) or pass it via `--cell-manifest`:
+
+```toml
+schema_version = "1.0"
+
+[cells.gf180mcu_ocd_ip_sram__sram1024x8m8wm1]
+kind = "ram"
+```
+
+Recognised `kind` values in v1.0: `std`, `dff`, `latch`, `clock_gate`,
+`ram`, `filler`, `endcap`, `tap`, `io_pad_input`, `io_pad_output`,
+`io_pad_bidir`, `delay`, `multi_output`, `tie_high`, `tie_low`.
+
+### Step 3: Invoke jacquard with the manifest
+
+```sh
+jacquard sim my_chip.v stim.vcd out.vcd 1 \
+    --cell-library deps/gf180mcu_ocd_ip_sram/cells/gf180mcu_ocd_ip_sram__sram1024x8m8wm1/gf180mcu_ocd_ip_sram__sram1024x8m8wm1__blackbox.v
+```
+
+The `--cell-library` flag is repeatable for multi-IP designs.
+
+### What `kind = "ram"` delivers in v1.0
+
+The cell's output pins become X-source slots in the AIG. The SRAM's
+internal memory behaviour is **not** modelled in v1.0 — sufficient for
+designs whose CPU executes from boot ROM / register file and never
+reads SRAM contents at the timescales Jacquard simulates
+(the heartbeat-verification case driving this work). Real memory
+modelling lands in a future
+schema version with explicit port-mapping (`[cells.NAME.ports]`).
+
+### Other kinds
+
+- `filler`, `endcap`, `tap` — physical-only, contribute no logic.
+- `io_pad_input` / `io_pad_output` / `io_pad_bidir` — pad-level
+  behaviour (parallel to the built-in `gf180mcu_ws_io__*` family).
+- `dff`, `latch`, `clock_gate`, `delay`, `multi_output` — recognised
+  but the v1.0 schema doesn't yet expose enough port semantics to
+  drive AIG construction for these. Coming in the port-mapping
+  schema (future ADR). For now, declaring these kinds documents
+  intent without changing behaviour.

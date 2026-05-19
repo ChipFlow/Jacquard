@@ -203,35 +203,42 @@ Counts after Phase 6:
 ## Follow-on cleanup
 
 These are nice-to-have refactors flagged during the GF180MCU work
-but deliberately out of scope for the enablement effort itself:
+but deliberately out of scope for the enablement effort itself.
 
-1. **`build.rs` pin-table generator for SKY130 too.** `build.rs::
-   generate_gf180mcu_pin_table` is a new precedent — scan +
-   parse + cross-assert. SKY130 still uses hand-rolled match arms
-   in `src/sky130.rs`. Porting SKY130 to the same mechanism would
-   remove ~200 LOC of mechanically-maintained tables.
+**Update 2026-05-19:** Items 1, 2, and 4 are now subsumed by
+[ADR 0010 — Declarative cell metadata](../adr/0010-declarative-cell-metadata.md)
+and its companion plan `declarative-cell-metadata.md`. The manifest
+pathway converts these from "Rust refactor" projects into "move data
+out of code as part of the migration to manifest-as-source-of-truth"
+— happens once, gets all three at once.
 
-2. **Physical relocation of shared PDK decomp infrastructure** out
-   of `sky130_pdk.rs` into `pdk_decomp.rs`. Phase 4 satisfied this
-   via re-exports + visibility bumps to `pub(crate)`; the real move
-   is deferred until a third PDK exercises the API surface.
+1. **~~`build.rs` pin-table generator for SKY130 too.~~** Subsumed by
+   ADR 0010 § "Deferred to a future ADR — `build.rs` pin-table
+   scanner removal." Removed LAST in the manifest migration, after
+   manifests cover the built-in PDKs.
+
+2. **~~Physical relocation of shared PDK decomp infrastructure~~** out
+   of `sky130_pdk.rs` into `pdk_decomp.rs`. Still relevant for the
+   built-in (Rust-decomp) pathway, since ADR 0010 keeps that path
+   load-bearing for cells with real AIG decomposition rules. Move
+   when a third PDK exercises the surface.
 
 3. **`CellLibrary` enum location.** Currently lives in `src/sky130.rs`
    even though it represents all PDKs. Moving to a neutral home
    (`src/pdk.rs` or `src/lib.rs`) is a trivial mechanical refactor.
+   Independent of ADR 0010.
 
-4. **IO and PR libraries.** `gf180mcu_fd_io` (pads, levelshifters)
-   and `gf180mcu_fd_pr` (primitives — diodes, R/C, antenna cells)
-   appear in real post-P&R netlists. Treated like `tap`/`fill`/`decap`
-   today (recognised but stubbed); will need richer modelling when
-   wafer.space test-run-1 designs arrive (Phase 7).
+4. **~~IO and PR libraries.~~** Now solved by the ADR 0010 manifest
+   pathway. `gf180mcu_fd_io` and `gf180mcu_fd_pr` cells can be
+   declared via `kind = "io_pad_*"` / `kind = "filler"` / `kind =
+   "tap"` etc. in user-supplied manifests — no Jacquard PR needed.
 
 5. **CI install strategy for GF180MCU Liberty.** Both the sky130 and
    gf180mcu multi-corner tests currently skip when the PDK isn't
    installed locally. CI integration (volare-on-CI or a vendored
    minimal Liberty subset) is the same blocker that gates the
    `inv_chain_pnr` sky130 corpus entry — out of scope for the GF180
-   enablement effort itself.
+   enablement effort itself. Unrelated to ADR 0010.
 
 ## Pitfalls (PDK-specific, for future readers)
 
