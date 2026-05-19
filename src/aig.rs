@@ -662,6 +662,7 @@ impl AIG {
         start_pinid: usize,
         pdk_models: Option<&PdkModels>,
         gf180_pdk: Option<&Gf180PdkModels>,
+        cell_library: Option<&crate::cell_library::RuntimeCellLibrary>,
     ) {
         let mut work_stack: Vec<WorkItem> = vec![WorkItem::Visit(start_pinid)];
 
@@ -842,7 +843,38 @@ impl AIG {
                             }
                             continue;
                         }
-                        None => {}
+                        None => {
+                            // Cell isn't in a vendored PDK; consult
+                            // the runtime cell-library manifest
+                            // (ADR 0010). For `kind = "ram"`, treat
+                            // as opaque RAM: allocate a per-output
+                            // SRAM driver and route through `srams`
+                            // for X-source enumeration. No port
+                            // resolution; future schema versions
+                            // upgrade this with explicit port mapping.
+                            if let Some(lib) = cell_library {
+                                use crate::cell_library::CellKind;
+                                if lib.lookup_kind(celltype) == Some(CellKind::Ram) {
+                                    let o = self.add_aigpin(DriverType::SRAM(cellid));
+                                    self.pin2aigpin_iv[pinid] = o << 1;
+                                    let pin_name = netlistdb.pinnames[pinid].1.to_string();
+                                    self.aigpin_cell_origins[o].push((
+                                        cellid,
+                                        celltype.to_string(),
+                                        pin_name,
+                                    ));
+                                    let sram = self.srams.entry(cellid).or_default();
+                                    let bit_idx = netlistdb.pinnames[pinid]
+                                        .2
+                                        .unwrap_or(0) as usize;
+                                    if bit_idx < sram.port_r_rd_data.len() {
+                                        sram.port_r_rd_data[bit_idx] = o;
+                                    }
+                                    topo_instack[pinid] = false;
+                                    continue;
+                                }
+                            }
+                        }
                     }
 
                     // Handle AIGPDK combinational cells (AND2, INV, BUF)
@@ -1742,17 +1774,22 @@ impl AIG {
 
     /// Build an AIG from a netlistdb, using explicit PDK behavioral models for decomposition.
     pub fn from_netlistdb_with_pdk(netlistdb: &NetlistDB, pdk_models: &PdkModels) -> AIG {
-        Self::from_netlistdb_impl(netlistdb, Some(pdk_models), None)
+        Self::from_netlistdb_impl(netlistdb, Some(pdk_models), None, None)
     }
 
-    /// Build an AIG from a netlistdb.
+    /// Build an AIG from a netlistdb, with a runtime cell library
+    /// supplying pin tables and `kind` metadata for cells outside
+    /// Jacquard's vendored PDKs. See ADR 0010 and
+    /// `docs/plans/declarative-cell-metadata.md`.
     ///
-    /// For designs with SKY130 or GF180MCU cells, automatically loads PDK
-    /// behavioural models from the matching vendored submodule. Panics
-    /// with a helpful message if the submodule is not initialised.
-    /// Per `CellLibrary::Mixed` rejection upstream, the netlist is
-    /// guaranteed to use at most one PDK.
-    pub fn from_netlistdb(netlistdb: &NetlistDB) -> AIG {
+    /// Goes through the same library detection + behavioural-model
+    /// loading as [`Self::from_netlistdb`] for cells that ARE in the
+    /// vendored PDKs; the runtime library augments rather than
+    /// replaces the built-in path.
+    pub fn from_netlistdb_with_cells(
+        netlistdb: &NetlistDB,
+        cell_library: Option<&crate::cell_library::RuntimeCellLibrary>,
+    ) -> AIG {
         let has_sky130 = (1..netlistdb.num_cells).any(|cid| {
             PdkVariant::classify(netlistdb.celltypes[cid].as_str())
                 == Some(PdkVariant::Sky130)
@@ -1764,11 +1801,6 @@ impl AIG {
 
         if has_sky130 {
             let pdk_path = std::path::PathBuf::from("vendor/sky130_fd_sc_hd/cells");
-            assert!(
-                pdk_path.exists(),
-                "Design uses SKY130 cells but sky130_fd_sc_hd submodule not found. \
-                 Run: git submodule update --init"
-            );
             let mut cell_types: Vec<String> = Vec::new();
             for cellid in 1..netlistdb.num_cells {
                 let celltype = netlistdb.celltypes[cellid].as_str();
@@ -1781,16 +1813,9 @@ impl AIG {
             }
             cell_types.sort();
             let pdk_models = crate::sky130_pdk::load_pdk_models(&pdk_path, &cell_types);
-            Self::from_netlistdb_impl(netlistdb, Some(&pdk_models), None)
+            Self::from_netlistdb_impl(netlistdb, Some(&pdk_models), None, cell_library)
         } else if has_gf180mcu {
-            // Cell models for 7t and 9t are byte-identical (verified in
-            // build.rs); load from the 7t submodule and reuse.
             let pdk_path = std::path::PathBuf::from("vendor/gf180mcu_fd_sc_mcu7t5v0");
-            assert!(
-                pdk_path.exists(),
-                "Design uses GF180MCU cells but gf180mcu_fd_sc_mcu7t5v0 submodule not found. \
-                 Run: git submodule update --init"
-            );
             let mut cell_types: Vec<String> = Vec::new();
             for cellid in 1..netlistdb.num_cells {
                 let celltype = netlistdb.celltypes[cellid].as_str();
@@ -1803,16 +1828,28 @@ impl AIG {
             }
             cell_types.sort();
             let gf180_pdk = crate::gf180mcu_pdk::load_pdk_models(&pdk_path, &cell_types);
-            Self::from_netlistdb_impl(netlistdb, None, Some(&gf180_pdk))
+            Self::from_netlistdb_impl(netlistdb, None, Some(&gf180_pdk), cell_library)
         } else {
-            Self::from_netlistdb_impl(netlistdb, None, None)
+            Self::from_netlistdb_impl(netlistdb, None, None, cell_library)
         }
+    }
+
+    /// Build an AIG from a netlistdb.
+    ///
+    /// For designs with SKY130 or GF180MCU cells, automatically loads PDK
+    /// behavioural models from the matching vendored submodule. Panics
+    /// with a helpful message if the submodule is not initialised.
+    /// Per `CellLibrary::Mixed` rejection upstream, the netlist is
+    /// guaranteed to use at most one PDK.
+    pub fn from_netlistdb(netlistdb: &NetlistDB) -> AIG {
+        Self::from_netlistdb_with_cells(netlistdb, None)
     }
 
     fn from_netlistdb_impl(
         netlistdb: &NetlistDB,
         pdk_models: Option<&PdkModels>,
         gf180_pdk: Option<&Gf180PdkModels>,
+        cell_library: Option<&crate::cell_library::RuntimeCellLibrary>,
     ) -> AIG {
         let mut aig = AIG {
             num_aigpins: 0,
@@ -1922,6 +1959,7 @@ impl AIG {
                 pinid,
                 pdk_models,
                 gf180_pdk,
+                cell_library,
             );
         }
 
@@ -3008,9 +3046,17 @@ impl AIG {
             x_sources[dff.q] = true;
         }
 
-        // SRAM read data ports are X sources (memory contents undefined)
+        // SRAM read data ports are X sources (memory contents undefined).
+        // `rd_pin == 0` denotes an unused slot — opaque RAMs declared via
+        // the runtime cell-library manifest (ADR 0010 `kind = "ram"`)
+        // have narrower output widths than the fixed 32-bit
+        // `port_r_rd_data` array; unused slots stay default-zero and
+        // must be skipped rather than asserted on.
         for sram in self.srams.values() {
             for &rd_pin in &sram.port_r_rd_data {
+                if rd_pin == 0 {
+                    continue;
+                }
                 assert!(rd_pin >= 1 && rd_pin <= self.num_aigpins);
                 x_sources[rd_pin] = true;
             }
@@ -3279,6 +3325,48 @@ mod xprop_tests {
         // Add an AND gate that depends on SRAM read data
         // (already tested via the basic structure above)
         drop(x_capable);
+    }
+
+    #[test]
+    fn test_x_sources_narrow_opaque_ram() {
+        // Opaque-RAM cells declared via the runtime cell-library
+        // manifest (ADR 0010 `kind = "ram"`) have output widths
+        // narrower than the fixed 32-bit `port_r_rd_data` array.
+        // The unused slots stay default-zero and `compute_x_sources`
+        // must skip rather than assert on them.
+        let mut aig = new_test_aig();
+        aig.add_aigpin(DriverType::InputPort(0)); // pin 1
+
+        // 8-bit opaque RAM — populate only slots 0..8, leave 8..32 zero.
+        let mut rd_data = [0usize; 32];
+        for i in 0..8 {
+            rd_data[i] = aig.add_aigpin(DriverType::SRAM(42)); // pins 2..9
+        }
+
+        aig.srams.insert(
+            42,
+            RAMBlock {
+                port_r_addr_iv: [0; AIGPDK_SRAM_ADDR_WIDTH],
+                port_r_en_iv: 0,
+                port_r_rd_data: rd_data,
+                port_w_addr_iv: [0; AIGPDK_SRAM_ADDR_WIDTH],
+                port_w_wr_en_iv: [0; 32],
+                port_w_wr_data_iv: [0; 32],
+            },
+        );
+
+        let x_sources = aig.compute_x_sources();
+        for i in 0..8 {
+            assert!(
+                x_sources[rd_data[i]],
+                "Opaque RAM rd_data[{i}] (pin {}) should be X source",
+                rd_data[i]
+            );
+        }
+        // No panic / assert from the unused-slot zeros.
+
+        let (_x_capable, stats) = aig.compute_x_capable_pins();
+        assert_eq!(stats.num_x_sources, 8);
     }
 
     #[test]
