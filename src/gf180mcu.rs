@@ -564,6 +564,53 @@ endmodule
     }
 
     #[test]
+    fn aig_clock_trace_accepts_bi_24t_on_clock_path() {
+        // Regression for #75: bidirectional IO pads on the clock
+        // path. The wafer.space `gf180mcu-project-template` default
+        // routes JTAG TCK (and any other debug clock) through the
+        // standard `bi_24t` signal-pad slot rather than dedicating
+        // an input-only pad to it. `bi_24t` is digitally simplified
+        // to `Y = PAD` (see is_io_pad_cell in gf180mcu_pdk.rs), so
+        // the clock-trace shape is identical to in_c / in_s — but
+        // it has an extra wrinkle: `A` and `OE` are also
+        // Direction::I (the core-side tristate driver inputs that
+        // get discarded). The pin enumeration must pick `PAD` as
+        // the clock source, not `A`.
+        //
+        // Synthetic shape: a DFF clocked through bi_24t (PAD →
+        // Y → DFF.CLK), with A and OE wired to constants the way
+        // a no-tristate output-disable wiring would look.
+        const VERILOG: &str = r#"
+module tiny(TCK_PAD, D, Q);
+  inout TCK_PAD;
+  input D;
+  output Q;
+  wire CLK_CORE, VDD, VSS, notifier;
+  gf180mcu_fd_io__bi_24t TCK_PAD_INST (
+      .PAD(TCK_PAD), .Y(CLK_CORE), .A(1'b0), .OE(1'b0),
+      .IE(1'b1), .PU(1'b0), .PD(1'b0), .CS(1'b0), .SL(1'b0)
+  );
+  gf180mcu_fd_sc_mcu7t5v0__dffq_1 DFF_1 (
+      .CLK(CLK_CORE), .D(D), .Q(Q), .notifier(notifier)
+  );
+endmodule
+"#;
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            VERILOG,
+            Some("tiny"),
+            &GF180MCULeafPins,
+        )
+        .expect("netlist parse");
+        // Used to panic in clock tracing — bi_24t wasn't on the
+        // is_io_pad_buf whitelist.
+        let aig = crate::aig::AIG::from_netlistdb(&nl);
+        assert!(
+            aig.num_aigpins > 0,
+            "AIG should have at least one pin after clock tracing through bi_24t"
+        );
+    }
+
+    #[test]
     fn netlist_db_parses_chip_top_pad_ring() {
         // Miniature GF180MCU chip-top: full pad ring around a trivial
         // core, covering every pad family that real post-P&R netlists

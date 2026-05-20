@@ -599,12 +599,17 @@ impl AIG {
                     let ct = PdkVariant::Gf180Mcu.extract_cell_type(celltype);
                     let is_inv = matches!(ct, "inv" | "clkinv");
                     let is_buf = matches!(ct, "buf" | "clkbuf");
-                    // GF180MCU input pads on the clock path buffer PAD → Y, so
-                    // they're traceable just like a clkbuf. bi_24t is *not*
-                    // included: a bidir pad clocking the core would more likely
-                    // be a netlist bug than an intentional design — keep the
-                    // matching tight so it still errors.
-                    let is_io_pad_buf = matches!(ct, "in_c" | "in_s");
+                    // GF180MCU input + bidir pads on the clock path buffer
+                    // PAD → Y, so they're traceable just like a clkbuf.
+                    // `bi_24t` is included because the digital-sim
+                    // simplification (`Y = PAD`, see is_io_pad_cell in
+                    // gf180mcu_pdk.rs) makes its AIG shape identical to
+                    // in_c / in_s. Common case: JTAG TCK routed through a
+                    // bidirectional signal pad in templates that don't
+                    // dedicate input-only pads to the clock (e.g. the
+                    // wafer.space gf180mcu-project-template default). See
+                    // #75.
+                    let is_io_pad_buf = matches!(ct, "in_c" | "in_s" | "bi_24t");
                     let is_delay = matches!(ct, "dlya" | "dlyb" | "dlyc" | "dlyd");
                     (is_inv, is_buf, is_io_pad_buf, is_delay)
                 }
@@ -619,6 +624,17 @@ impl AIG {
                 return Err(pinid);
             }
 
+            // `bi_24t` on the clock path: only PAD is the clock input.
+            // The cell also exposes `A` and `OE` as Direction::I (the
+            // core-side tristate driver inputs), but those are
+            // discarded by `gf180mcu_postprocess`'s `Y = PAD`
+            // simplification, so they're not part of the clock cone.
+            // Without this guard, both PAD and A match the
+            // "A | I | PAD" arm below and whichever is enumerated
+            // last wins — wrong if A wins. See #75.
+            let is_gf180mcu_bi_24t = matches!(variant, Some(PdkVariant::Gf180Mcu))
+                && PdkVariant::Gf180Mcu.extract_cell_type(celltype) == "bi_24t";
+
             for ipin in netlistdb.cell2pin.iter_set(cellid) {
                 if netlistdb.pindirect[ipin] == Direction::I {
                     let ipin_name = netlistdb.pinnames[ipin].1.as_str();
@@ -632,6 +648,9 @@ impl AIG {
                     if matches!(variant, Some(PdkVariant::Gf180Mcu))
                         && crate::gf180mcu_pdk::is_power_pin(ipin_name)
                     {
+                        continue;
+                    }
+                    if is_gf180mcu_bi_24t && matches!(ipin_name, "A" | "OE") {
                         continue;
                     }
                     match ipin_name {
