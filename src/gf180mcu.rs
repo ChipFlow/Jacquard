@@ -521,6 +521,49 @@ endmodule
     }
 
     #[test]
+    fn aig_clock_trace_accepts_delay_cells_on_clock_path() {
+        // Regression for #73: OpenROAD's hold-fixing pass inserts
+        // `dlyd_*` / `dlya_*` / `dlyb_*` / `dlyc_*` delay cells on
+        // clock fanout to repair tight hold paths. These are
+        // functionally identity buffers (I → Z, no negation, no
+        // gating) so clock tracing should pass through them the
+        // same way it passes through `clkbuf` / `buf` cells.
+        // Before the fix the clock-tracer rejected the cell type
+        // and panicked with "multi-input cell ⇒ clock gating".
+        //
+        // Synthetic shape: a DFF clocked through `clkbuf → dlyd → DFF`
+        // (OpenROAD's typical hold-fix-on-clock-fanout pattern).
+        const VERILOG: &str = r#"
+module tiny(CLK_PAD, D, Q);
+  input CLK_PAD, D;
+  output Q;
+  wire CLK_BUF, CLK_DLY, VDD, VSS, notifier;
+  gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 CLKBUF_1 (
+      .I(CLK_PAD), .Z(CLK_BUF), .VDD(VDD), .VSS(VSS), .VNW(VDD), .VPW(VSS)
+  );
+  gf180mcu_fd_sc_mcu9t5v0__dlyd_1 DLY_1 (
+      .I(CLK_BUF), .Z(CLK_DLY), .VDD(VDD), .VSS(VSS), .VNW(VDD), .VPW(VSS)
+  );
+  gf180mcu_fd_sc_mcu7t5v0__dffq_1 DFF_1 (
+      .CLK(CLK_DLY), .D(D), .Q(Q), .notifier(notifier)
+  );
+endmodule
+"#;
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            VERILOG,
+            Some("tiny"),
+            &GF180MCULeafPins,
+        )
+        .expect("netlist parse");
+        // Used to panic in clock tracing on the dlyd_1 cell.
+        let aig = crate::aig::AIG::from_netlistdb(&nl);
+        assert!(
+            aig.num_aigpins > 0,
+            "AIG should have at least one pin after clock tracing through dlyd"
+        );
+    }
+
+    #[test]
     fn netlist_db_parses_chip_top_pad_ring() {
         // Miniature GF180MCU chip-top: full pad ring around a trivial
         // core, covering every pad family that real post-P&R netlists

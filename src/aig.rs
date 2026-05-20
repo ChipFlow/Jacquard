@@ -566,7 +566,24 @@ impl AIG {
             // identity. GF180MCU clock-path cells use input pin name `I` rather
             // than `A`; we accept both below.
             let variant = PdkVariant::classify(celltype);
-            let (is_inv, is_buf, is_io_pad_buf) = match variant {
+            // (is_inv, is_buf, is_io_pad_buf, is_delay).
+            //
+            // Delay cells (`dlya`/`dlyb`/`dlyc`/`dlyd` for GF180MCU;
+            // `dlygate*`/`dlymetal*` for SKY130) are functional identity
+            // buffers — single input, single output, no gating, no
+            // negation. The post-P&R OpenROAD hold-fixing pass routinely
+            // inserts them on clock fanout to repair tight hold paths.
+            // Treated like `is_buf` in the downstream propagation
+            // (current_pinid = pin_a, is_negedge unchanged). Kept
+            // separate from `is_buf` so timing-analysis paths can
+            // distinguish "identity buffer" from "identity buffer with
+            // a delay constant" if they need to. See #73.
+            //
+            // GF180MCU `hold` is **not** included — it's OpenROAD's
+            // data-path hold-fix cell, not expected on a clock fanout.
+            // If one does appear, that's likely a netlist bug worth
+            // surfacing rather than silently traversing.
+            let (is_inv, is_buf, is_io_pad_buf, is_delay) = match variant {
                 Some(PdkVariant::Sky130) => {
                     let ct = PdkVariant::Sky130.extract_cell_type(celltype);
                     let is_inv = ct.starts_with("inv") || ct.starts_with("clkinv");
@@ -575,7 +592,8 @@ impl AIG {
                         || ct.starts_with("clkdlybuf")
                         || ct.starts_with("lpflow_isobufsrc")
                         || ct.starts_with("lpflow_inputiso");
-                    (is_inv, is_buf, false)
+                    let is_delay = ct.starts_with("dlygate") || ct.starts_with("dlymetal");
+                    (is_inv, is_buf, false, is_delay)
                 }
                 Some(PdkVariant::Gf180Mcu) => {
                     let ct = PdkVariant::Gf180Mcu.extract_cell_type(celltype);
@@ -587,14 +605,15 @@ impl AIG {
                     // be a netlist bug than an intentional design — keep the
                     // matching tight so it still errors.
                     let is_io_pad_buf = matches!(ct, "in_c" | "in_s");
-                    (is_inv, is_buf, is_io_pad_buf)
+                    let is_delay = matches!(ct, "dlya" | "dlyb" | "dlyc" | "dlyd");
+                    (is_inv, is_buf, is_io_pad_buf, is_delay)
                 }
-                None => (celltype == "INV", celltype == "BUF", false),
+                None => (celltype == "INV", celltype == "BUF", false, false),
             };
 
-            if !is_inv && !is_buf && !is_io_pad_buf && celltype != "CKLNQD" {
+            if !is_inv && !is_buf && !is_io_pad_buf && !is_delay && celltype != "CKLNQD" {
                 clilog::error!(
-                    "cell type {} not supported on clock path. expecting only INV, BUF, or CKLNQD (or SKY130 / GF180MCU equivalents)",
+                    "cell type {} not supported on clock path. expecting only INV, BUF, CKLNQD, or a delay cell (or SKY130 / GF180MCU equivalents)",
                     celltype
                 );
                 return Err(pinid);
@@ -642,10 +661,12 @@ impl AIG {
                 assert_ne!(pin_a, usize::MAX);
                 current_pinid = pin_a;
                 current_is_negedge = !is_negedge;
-            } else if is_buf || is_io_pad_buf {
+            } else if is_buf || is_io_pad_buf || is_delay {
                 assert_ne!(pin_a, usize::MAX);
                 current_pinid = pin_a;
-                // is_negedge stays the same
+                // is_negedge stays the same. Delay cells (`dlya/b/c/d`,
+                // `dlygate*`, `dlymetal*`) propagate the clock through
+                // their delay constant just like a plain buffer — see #73.
             } else if celltype == "CKLNQD" {
                 assert_ne!(pin_cp, usize::MAX);
                 assert_ne!(pin_en, usize::MAX);
