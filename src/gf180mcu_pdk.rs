@@ -394,6 +394,29 @@ pub fn is_multi_output_cell(cell_type: &str) -> bool {
     matches!(cell_type, "addf" | "addh")
 }
 
+/// Power / ground pin name set used across the GF180MCU standard-cell
+/// and pad libraries, plus the wafer.space power-pad naming
+/// (`DVDD`/`DVSS`/`AVDD`/`AVSS`). Single source of truth for both
+/// pin-direction resolution (`GF180MCULeafPins::direction_of`) and
+/// the clock-tracing pin-enumeration skip in `aig.rs`. See PR #70
+/// for context on the latter: post-#64 these names resolve to
+/// `Direction::I`, so the clock-tracer's "any non-clock input pin
+/// ⇒ multi-input cell ⇒ clock gating" rule started tripping on
+/// every clkbuf cell that has wired power pins.
+pub const POWER_PIN_NAMES: &[&str] = &[
+    "VDD", "VSS", "VNW", "VPW", "VPB", "VNB", "VPWR", "VGND", "DVDD", "DVSS", "AVDD", "AVSS",
+];
+
+/// True if `name` is a power / ground pin per [`POWER_PIN_NAMES`].
+///
+/// Power pins are physical (supply) connections — they are never
+/// driven by, and do not drive, simulation logic. Callers should
+/// short-circuit them: resolve to `Direction::I` for the netlist
+/// reader, skip them during clock-path pin enumeration, etc.
+pub fn is_power_pin(name: &str) -> bool {
+    POWER_PIN_NAMES.contains(&name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

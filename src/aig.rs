@@ -602,7 +602,20 @@ impl AIG {
 
             for ipin in netlistdb.cell2pin.iter_set(cellid) {
                 if netlistdb.pindirect[ipin] == Direction::I {
-                    match netlistdb.pinnames[ipin].1.as_str() {
+                    let ipin_name = netlistdb.pinnames[ipin].1.as_str();
+                    // Power / ground pins on the clock-buffer cell. Post-#64
+                    // these resolve to `Direction::I` (the power-pin
+                    // shortcut in `GF180MCULeafPins::direction_of`), but
+                    // they're physical supply connections — never a clock
+                    // source. Skipping here keeps the "multi-input ⇒ clock
+                    // gating" rule honest by ignoring them, the same way
+                    // the IO-pad control pins below are ignored. See #70.
+                    if matches!(variant, Some(PdkVariant::Gf180Mcu))
+                        && crate::gf180mcu_pdk::is_power_pin(ipin_name)
+                    {
+                        continue;
+                    }
+                    match ipin_name {
                         // AIGPDK / sky130 use `A`; GF180MCU buf/inv cells
                         // use `I`; GF180MCU input pads carry the clock
                         // on `PAD`.

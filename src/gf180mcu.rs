@@ -183,14 +183,10 @@ impl LeafPinProvider for GF180MCULeafPins {
         // `inout VDD, VSS;` on antenna) but build.rs only parses
         // `input`/`output` declarations, so the generated GF180MCU_PIN_TABLE
         // is missing them. The post-PnR netlist connects them explicitly,
-        // which otherwise panics on the first VDD lookup. Local
-        // apitronix-integration patch (2026-05-16) — file upstream once
-        // verified across enough cells.
-        if matches!(
-            pin_name.as_str(),
-            "VDD" | "VSS" | "VNW" | "VPW" | "VPB" | "VNB" | "VPWR" | "VGND"
-                | "DVDD" | "DVSS" | "AVDD" | "AVSS"
-        ) {
+        // which otherwise panics on the first VDD lookup. The name set
+        // lives in `gf180mcu_pdk::POWER_PIN_NAMES` so the clock-tracing
+        // pin-enumeration skip in aig.rs uses the same source of truth.
+        if crate::gf180mcu_pdk::is_power_pin(pin_name.as_str()) {
             // Direction enum in eda-infra-rs has no `Inout` variant
             // (I / O / Unknown only). Power pins are effectively inputs —
             // driven from the supply, never driven by the cell — so `I`
@@ -481,6 +477,47 @@ endmodule
         // Exact AIG-pin count varies with synthesis choices; just assert
         // construction succeeded and produced a non-empty AIG.
         assert!(aig.num_aigpins > 0, "AIG should have at least one pin");
+    }
+
+    #[test]
+    fn aig_clock_trace_skips_power_pins_on_clkbuf() {
+        // Regression for #70: post-#64, power pins on a clkbuf resolve to
+        // `Direction::I`, which made the clock-tracing pin-enumeration
+        // loop treat them as unrecognised signal inputs and panic with
+        // "input pin VDD unexpected for ck element ... multi-input cell
+        // ... clock gating need to be manually patched."
+        //
+        // Synthetic shape: a single DFF clocked through a clkbuf that
+        // has VDD / VSS wired (the real-world chip_top.pnl.v pattern).
+        // Without the fix the AIG::from_netlistdb call panics during
+        // clock tracing.
+        const VERILOG: &str = r#"
+module tiny(CLK_PAD, D, Q);
+  input CLK_PAD, D;
+  output Q;
+  wire CLK_INTERNAL, VDD, VSS, notifier;
+  // Clock buffer with realistic power-pin wiring.
+  gf180mcu_fd_sc_mcu9t5v0__clkbuf_8 CLKBUF_1 (
+      .I(CLK_PAD), .Z(CLK_INTERNAL), .VDD(VDD), .VSS(VSS), .VNW(VDD), .VPW(VSS)
+  );
+  gf180mcu_fd_sc_mcu7t5v0__dffq_1 DFF_1 (
+      .CLK(CLK_INTERNAL), .D(D), .Q(Q), .notifier(notifier)
+  );
+endmodule
+"#;
+        let nl = netlistdb::NetlistDB::from_sverilog_source(
+            VERILOG,
+            Some("tiny"),
+            &GF180MCULeafPins,
+        )
+        .expect("netlist parse");
+        // The actual test: this used to panic. After the fix, AIG
+        // construction completes without error.
+        let aig = crate::aig::AIG::from_netlistdb(&nl);
+        assert!(
+            aig.num_aigpins > 0,
+            "AIG should have at least one pin after clock tracing"
+        );
     }
 
     #[test]
