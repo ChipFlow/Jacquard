@@ -3356,19 +3356,25 @@ mod xprop_tests {
         use sverilogparse::SVerilogRange;
 
         // Blackbox interface mirroring
-        // gf180mcu_ocd_ip_sram__sram1024x8m8wm1. Uses the
-        // module-header-only port list with separate declarations
-        // (sverilogparse's preferred shape — confirmed by the
-        // existing AIGPDK / SKY130 / GF180MCU vendored blackboxes).
+        // gf180mcu_ocd_ip_sram__sram1024x8m8wm1, verbatim from
+        // RTimothyEdwards/gf180mcu_ocd_ip_sram. Uses the ANSI-style
+        // port-list form that's dominant in modern third-party IP
+        // blackbox.v files — supported via the sverilogparse fix
+        // in ChipFlow/eda-infra-rs#1 (closes #69). Before that fix
+        // landed, this test had to be written in the older
+        // port-names-in-header + separate body declarations form
+        // as a workaround.
         const OCD_SRAM_BLACKBOX: &str = "\
-module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (CLK, CEN, GWEN, WEN, A, D, Q);
-  input CLK;
-  input CEN;
-  input GWEN;
-  input [7:0] WEN;
-  input [9:0] A;
-  input [7:0] D;
-  output [7:0] Q;
+(* blackbox *)
+module gf180mcu_ocd_ip_sram__sram1024x8m8wm1 (
+  input         CLK,
+  input         CEN,
+  input         GWEN,
+  input  [7:0]  WEN,
+  input  [9:0]  A,
+  input  [7:0]  D,
+  output [7:0]  Q
+);
 endmodule
 ";
 
